@@ -8,16 +8,18 @@
 create table if not exists plans (
     id              uuid primary key default gen_random_uuid(),
     name            text not null unique,
-    description     text,
-    price_monthly   numeric(10,2) default 0,
-    price_yearly    numeric(10,2) default 0,
-    request_quota   integer default 20,
-    max_documents   integer default 10,
-    max_file_size_mb integer default 10,
-    features        jsonb default '[]',
-    is_active       boolean default true,
     created_at      timestamptz default now()
 );
+
+-- Safely add columns in case table already existed without them
+alter table plans add column if not exists description     text;
+alter table plans add column if not exists price_monthly   numeric(10,2) default 0;
+alter table plans add column if not exists price_yearly    numeric(10,2) default 0;
+alter table plans add column if not exists request_quota   integer default 20;
+alter table plans add column if not exists max_documents   integer default 10;
+alter table plans add column if not exists max_file_size_mb integer default 10;
+alter table plans add column if not exists features        jsonb default '[]';
+alter table plans add column if not exists is_active       boolean default true;
 
 -- Seed default plans
 insert into plans (name, description, price_monthly, price_yearly, request_quota, max_documents, features, is_active)
@@ -200,16 +202,21 @@ create table if not exists usage_logs (
     user_id     uuid references auth.users on delete set null,
     action      text not null,
     document_id uuid references documents(id) on delete set null,
-    tokens_used integer default 0,
-    cost_usd    numeric(10,6) default 0,
-    metadata    jsonb default '{}',
     created_at  timestamptz default now()
 );
+
+-- Safely add columns in case table already existed without them
+alter table usage_logs add column if not exists tokens_used integer default 0;
+alter table usage_logs add column if not exists cost_usd    numeric(10,6) default 0;
+alter table usage_logs add column if not exists metadata    jsonb default '{}';
 
 create index if not exists idx_usage_logs_user_created
     on usage_logs (user_id, created_at desc);
 
 -- ── 11. user_usage_summary (view) ────────────────────────────────────────────
+-- Drop if it exists as a table (old schema), then recreate as a view
+drop table if exists user_usage_summary cascade;
+drop view if exists user_usage_summary cascade;
 create or replace view user_usage_summary as
 select
     up.user_id,

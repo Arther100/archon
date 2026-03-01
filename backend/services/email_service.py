@@ -10,6 +10,7 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ def send_welcome_email(to_email: str, display_name: str = "") -> bool:
     </table>
     <p>Get started by uploading your first document!</p>
     <div style="margin:20px 0;">
-        <a href="http://localhost:5173/" style="display:inline-block;padding:10px 24px;background:#3b6ef5;color:#fff;border-radius:8px;font-weight:600;font-size:13px;text-decoration:none;">Open Blueprint Engine →</a>
+        <a href="{settings.FRONTEND_URL}" style="display:inline-block;padding:10px 24px;background:#3b6ef5;color:#fff;border-radius:8px;font-weight:600;font-size:13px;text-decoration:none;">Open Blueprint Engine →</a>
     </div>
     <p style="font-size:12px;color:#4a5568;">If you didn't create this account, please ignore this email.</p>
     """

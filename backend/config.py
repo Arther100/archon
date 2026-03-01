@@ -30,4 +30,7 @@ class Settings:
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Blueprint Engine")
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", os.getenv("SMTP_USER", ""))
 
+    # Frontend URL — used in email templates and redirects
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 settings = Settings()

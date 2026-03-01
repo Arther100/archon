@@ -37,12 +37,7 @@ export default function UploadPage() {
             form.append('file', accepted[0])
             if (standards.trim()) form.append('standards', standards.trim())
 
-            const result = await fetch('/api/upload', { method: 'POST', body: form })
-            if (!result.ok) {
-                const err = await result.json().catch(() => ({ detail: 'Upload failed' }))
-                throw new Error(err.detail || `HTTP ${result.status}`)
-            }
-            const data = await result.json()
+            const data = await api.upload(form)
             setState({ status: 'done', error: null, result: data })
             setTimeout(() => navigate(analysisRoute(data.document_id)), 1200)
         } catch (e) {

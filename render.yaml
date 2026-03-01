@@ -48,14 +48,9 @@ services:
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    publishPath: ./dist
     plan: free
     envVars:
       # After backend deploys, set this to: https://archon-backend.onrender.com
       - key: VITE_API_URL
         sync: false
-    routes:
-      # SPA fallback — all routes serve index.html
-      - type: rewrite
-        source: /*
-        destination: /index.html

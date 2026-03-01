@@ -1,5 +1,6 @@
 // ── AuthContext — manages Supabase session via JWT in localStorage ─────────────
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { ENV } from '../config/env'
 
 const AuthContext = createContext(null)
 
@@ -21,7 +22,7 @@ export function AuthProvider({ children }) {
         const rt = localStorage.getItem(REFRESH_KEY)
         if (!rt) return null
         try {
-            const res = await fetch('/api/auth/refresh', {
+            const res = await fetch(`${ENV.API_URL}/api/auth/refresh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refresh_token: rt }),
@@ -65,7 +66,7 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         const stored = localStorage.getItem(TOKEN_KEY)
         if (!stored) { setAuthChecked(true); return }
-        fetch('/api/auth/me', { headers: { Authorization: `Bearer ${stored}` } })
+        fetch(`${ENV.API_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${stored}` } })
             .then(r => r.ok ? r.json() : null)
             .then(async (data) => {
                 if (data) {
@@ -141,7 +142,7 @@ export function AuthProvider({ children }) {
 
     const login = useCallback(async (email, password) => {
         setLoading(true)
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(`${ENV.API_URL}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
@@ -156,7 +157,7 @@ export function AuthProvider({ children }) {
 
     const signup = useCallback(async (email, password, username) => {
         setLoading(true)
-        const res = await fetch('/api/auth/signup', {
+        const res = await fetch(`${ENV.API_URL}/api/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password, username }),
@@ -165,7 +166,7 @@ export function AuthProvider({ children }) {
         setLoading(false)
         if (!res.ok) throw new Error(data.detail || 'Signup failed')
         // Auto-login after successful signup
-        const loginRes = await fetch('/api/auth/login', {
+        const loginRes = await fetch(`${ENV.API_URL}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
@@ -180,7 +181,7 @@ export function AuthProvider({ children }) {
     const logout = useCallback(async () => {
         const t = localStorage.getItem(TOKEN_KEY)
         if (t) {
-            fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${t}` } }).catch(() => { })
+            fetch(`${ENV.API_URL}/api/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } }).catch(() => { })
         }
         clearSession()
     }, [])
@@ -190,7 +191,7 @@ export function AuthProvider({ children }) {
         const t = localStorage.getItem(TOKEN_KEY)
         if (!t) return
         try {
-            const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${t}` } })
+            const res = await fetch(`${ENV.API_URL}/api/auth/me`, { headers: { Authorization: `Bearer ${t}` } })
             if (res.ok) {
                 const data = await res.json()
                 updateUser({

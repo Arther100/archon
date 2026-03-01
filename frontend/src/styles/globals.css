@@ -1,0 +1,332 @@
+/* globals.css — Archon Design System */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0a0d14;
+  --bg-card: #111622;
+  --bg-card-hover: #161d2e;
+  --bg-input: #0d1219;
+  --border: #1e2a3d;
+  --border-active: #3b6ef5;
+  --accent: #3b6ef5;
+  --accent-hover: #2d5ce0;
+  --accent-glow: rgba(59, 110, 245, 0.15);
+  --accent-soft: rgba(59, 110, 245, 0.08);
+  --accent-light: #7ba4f8;
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --text-primary: #f0f4ff;
+  --text-secondary: #8896b3;
+  --text-muted: #4a5568;
+  --text-code: #7dd3fc;
+  --font-base: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 24px rgba(59, 110, 245, 0.2);
+  --spinner-color: #3b6ef5;
+  --transition: all 0.2s ease;
+}
+
+html, body, #root {
+  height: 100%;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* badge using theme accent */
+.badge-accent { background: var(--accent-glow); color: var(--accent-light, var(--accent)); }
+
+/* ── Utility classes ───────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-blue { background: rgba(59,110,245,0.15); color: #7ba4f8; }
+.badge-green { background: rgba(34,197,94,0.1); color: #4ade80; }
+.badge-amber { background: rgba(245,158,11,0.1); color: #fbbf24; }
+.badge-red   { background: rgba(239,68,68,0.1); color: #f87171; }
+
+/* ── Markdown rendered output ──────────────────────── */
+.md-output h1, .md-output h2, .md-output h3 {
+  color: var(--text-primary);
+  margin: 1.2em 0 0.5em;
+  font-weight: 600;
+}
+.md-output h2 { font-size: 1.15rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.md-output a { color: var(--accent); }
+.md-output h3 { font-size: 1rem; color: #a5b4fc; }
+.md-output p { color: var(--text-secondary); margin-bottom: 0.75em; }
+.md-output ul, .md-output ol { margin: 0.5em 0 0.75em 1.4em; color: var(--text-secondary); }
+.md-output li { margin-bottom: 4px; }
+.md-output strong { color: var(--text-primary); font-weight: 600; }
+.md-output code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: rgba(59,110,245,0.1);
+  color: var(--text-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.md-output blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* ── Animations ────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.fade-in { animation: fadeIn 0.25s ease forwards; }
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--spinner-color, var(--accent));
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* ── Mobile Responsive ─────────────────────────────── */
+
+/* Mobile-first utility classes */
+.hide-mobile { display: block; }
+.show-mobile { display: none; }
+
+/* Responsive text */
+.responsive-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+}
+
+/* Responsive cards */
+.responsive-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+  width: 100%;
+}
+
+/* Responsive table wrapper — horizontal scroll on mobile */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive table {
+  min-width: 600px;
+}
+
+/* Mobile hamburger */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+/* Mobile overlay for sidebar */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 90;
+  backdrop-filter: blur(4px);
+}
+.sidebar-overlay.active { display: block; }
+
+/* ── Tablet (≤1024px) ──────────────────────────────── */
+@media (max-width: 1024px) {
+  .responsive-title { font-size: 1.75rem; }
+  .responsive-card { padding: 20px; }
+
+  /* Shrink analysis module sidebar */
+  .module-sidebar { width: 200px !important; min-width: 200px !important; }
+  .field-detail-panel { width: 260px !important; }
+}
+
+/* ── Mobile (≤768px) ───────────────────────────────── */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
+  .mobile-menu-btn { display: flex !important; }
+
+  .responsive-title { font-size: 1.4rem; }
+  .responsive-card { padding: 16px; border-radius: var(--radius-md); }
+
+  /* Stack flex layouts vertically */
+  .responsive-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  /* Full-width buttons */
+  .responsive-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Sidebar — slide in from left as overlay */
+  .sidebar-mobile {
+    position: fixed !important;
+    left: -280px;
+    top: 0;
+    height: 100vh;
+    width: 260px !important;
+    min-width: 260px !important;
+    z-index: 100;
+    transition: left 0.3s ease;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar-mobile.open {
+    left: 0;
+  }
+
+  /* Header — compact */
+  .header-mobile {
+    padding: 10px 16px !important;
+  }
+  .header-nav-mobile { display: none !important; }
+
+  /* Main content — full width */
+  .main-content-mobile {
+    padding: 16px !important;
+  }
+
+  /* Dropzone — smaller on mobile */
+  .dropzone-mobile {
+    padding: 40px 24px !important;
+  }
+
+  /* Module sidebar in analysis — hide or collapse */
+  .module-sidebar {
+    display: none !important;
+  }
+  .module-sidebar-mobile {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Field detail panel — full width overlay */
+  .field-detail-panel {
+    position: fixed !important;
+    right: 0 !important;
+    top: 0 !important;
+    height: 100vh !important;
+    width: 85vw !important;
+    max-width: 320px !important;
+    z-index: 200;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Profile dropdown — full width */
+  .profile-dropdown-mobile {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  /* Badge adjustments */
+  .badge { font-size: 0.68rem; padding: 2px 8px; }
+
+  /* All tables should scroll horizontally on mobile */
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+  thead, tbody, tr { display: table; width: 100%; table-layout: auto; }
+
+  /* Admin page containers — tighter padding */
+  main > div[style], div[style*="padding: 28px"] {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  /* Markdown content */
+  .md-output { font-size: 0.9rem; }
+  .md-output h2 { font-size: 1.05rem; }
+  .md-output code { font-size: 0.8em; word-break: break-all; }
+}
+
+/* ── Small mobile (≤480px) ─────────────────────────── */
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+  .responsive-title { font-size: 1.25rem; }
+  .responsive-card { padding: 14px; }
+
+  .dropzone-mobile {
+    padding: 32px 16px !important;
+  }
+
+  .profile-dropdown-mobile {
+    max-height: 80vh;
+  }
+
+  /* Smaller role badges */
+  .role-badge-mobile {
+    font-size: 0.55rem !important;
+    padding: 2px 6px !important;
+  }
+}

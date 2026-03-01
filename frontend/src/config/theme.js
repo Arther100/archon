@@ -1,0 +1,55 @@
+// Centralized design tokens — no colors/sizes/fonts in components
+export const THEME = {
+    colors: {
+        bg: '#0a0d14',
+        bgCard: '#111622',
+        bgCardHover: '#161d2e',
+        bgInput: '#0d1219',
+        border: '#1e2a3d',
+        borderActive: '#3b6ef5',
+        accent: '#3b6ef5',
+        accentHover: '#2d5ce0',
+        accentGlow: 'rgba(59,110,245,0.15)',
+        success: '#22c55e',
+        successBg: 'rgba(34,197,94,0.1)',
+        warning: '#f59e0b',
+        warningBg: 'rgba(245,158,11,0.1)',
+        danger: '#ef4444',
+        dangerBg: 'rgba(239,68,68,0.1)',
+        textPrimary: '#f0f4ff',
+        textSecondary: '#8896b3',
+        textMuted: '#4a5568',
+        textCode: '#7dd3fc',
+        badge: {
+            blue: { bg: 'rgba(59,110,245,0.15)', text: '#7ba4f8' },
+            green: { bg: 'rgba(34,197,94,0.1)', text: '#4ade80' },
+            amber: { bg: 'rgba(245,158,11,0.1)', text: '#fbbf24' },
+        },
+    },
+    font: {
+        base: "'Inter', sans-serif",
+        mono: "'JetBrains Mono', monospace",
+        sizes: {
+            xs: '0.75rem',
+            sm: '0.875rem',
+            md: '1rem',
+            lg: '1.125rem',
+            xl: '1.25rem',
+            '2xl': '1.5rem',
+            '3xl': '1.875rem',
+            '4xl': '2.25rem',
+        },
+        weights: { light: 300, regular: 400, medium: 500, semibold: 600, bold: 700 },
+    },
+    spacing: {
+        xs: '4px', sm: '8px', md: '16px', lg: '24px', xl: '32px', '2xl': '48px', '3xl': '64px',
+    },
+    radius: {
+        sm: '6px', md: '10px', lg: '16px', xl: '24px', full: '9999px',
+    },
+    shadow: {
+        card: '0 4px 24px rgba(0,0,0,0.4)',
+        glow: '0 0 24px rgba(59,110,245,0.2)',
+    },
+    transition: 'all 0.2s ease',
+}

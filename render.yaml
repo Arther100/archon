@@ -51,12 +51,9 @@ services:
     staticPublishPath: ./dist
     plan: free
     envVars:
-      # Point to backend — set this to your deployed backend URL
+      # After backend deploys, set this to: https://archon-backend.onrender.com
       - key: VITE_API_URL
-        fromService:
-          name: archon-backend
-          type: web
-          property: url
+        sync: false
     routes:
       # SPA fallback — all routes serve index.html
       - type: rewrite

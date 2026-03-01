@@ -3,12 +3,13 @@ upload.py — POST /upload
 Accepts PDF or DOCX, extracts text, splits into modules, stores all in Supabase.
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from typing import Optional
 from config import settings
 from services.parser import extract_text, extract_structured
 from services.module_detector import detect_modules_from_structured, detect_modules_from_text
 from db.supabase_client import get_supabase
+from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
@@ -16,7 +17,8 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 @router.post("")
 async def upload_document(
     file: UploadFile = File(...),
-    standards: Optional[str] = Form(None),  # Enhancement 5 — paste ARCHITECTURE.md content
+    standards: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user),
 ):
     # ── Validate extension ────────────────────────────────
     ext = file.filename.rsplit(".", 1)[-1].lower()
@@ -59,6 +61,7 @@ async def upload_document(
         "file_type": ext,
         "raw_text": raw_text,
         "standards_text": standards.strip() if standards else None,
+        "user_id": current_user["id"],
     }).execute()
 
     if not doc_result.data:

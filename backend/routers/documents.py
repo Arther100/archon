@@ -3,19 +3,21 @@ documents.py — GET /documents, GET /documents/{id}/modules, DELETE /documents/
 """
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from db.supabase_client import get_supabase
+from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
 @router.get("")
-def list_documents():
-    """Return all uploaded documents (excluding soft-deleted)."""
+def list_documents(current_user: dict = Depends(get_current_user)):
+    """Return documents belonging to the current user (excluding soft-deleted)."""
     sb = get_supabase()
     result = (
         sb.table("documents")
         .select("id, file_name, file_type, created_at")
+        .eq("user_id", current_user["id"])
         .is_("deleted_at", "null")
         .order("created_at", desc=True)
         .execute()
@@ -24,12 +26,12 @@ def list_documents():
 
 
 @router.delete("/{document_id}")
-def soft_delete_document(document_id: str):
+def soft_delete_document(document_id: str, current_user: dict = Depends(get_current_user)):
     """Soft-delete a document by setting deleted_at timestamp."""
     sb = get_supabase()
 
-    # Verify document exists and is not already deleted
-    doc = sb.table("documents").select("id").eq("id", document_id).is_("deleted_at", "null").execute()
+    # Verify document exists, is not already deleted, and belongs to current user
+    doc = sb.table("documents").select("id").eq("id", document_id).eq("user_id", current_user["id"]).is_("deleted_at", "null").execute()
     if not doc.data:
         raise HTTPException(status_code=404, detail="Document not found.")
 

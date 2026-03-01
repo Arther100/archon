@@ -61,6 +61,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+-- Add avatar_url column (stored here instead of user_metadata to avoid JWT bloat)
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS avatar_url text DEFAULT '';
+
 -- ── 4. notifications ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notifications (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

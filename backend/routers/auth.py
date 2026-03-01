@@ -20,6 +20,18 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 security = HTTPBearer(auto_error=False)
 
 
+def _get_avatar_from_profile(user_id: str) -> str:
+    """Fetch avatar_url from user_profiles (NOT user_metadata, to avoid JWT bloat)."""
+    try:
+        sb = get_supabase()
+        result = sb.table("user_profiles").select("avatar_url").eq("user_id", user_id).limit(1).execute()
+        if result.data and result.data[0].get("avatar_url"):
+            return result.data[0]["avatar_url"]
+    except Exception:
+        pass
+    return ""
+
+
 class AuthPayload(BaseModel):
     email: str
     password: str
@@ -104,7 +116,7 @@ def login(body: AuthPayload):
         "user_id": str(res.user.id),
         "email": res.user.email,
         "display_name": meta.get("display_name", ""),
-        "avatar_url": meta.get("avatar_url", ""),
+        "avatar_url": _get_avatar_from_profile(str(res.user.id)),
         "theme_color": meta.get("theme_color", "#3b6ef5"),
         "github_url": meta.get("github_url", ""),
         "linkedin_url": meta.get("linkedin_url", ""),
@@ -134,13 +146,14 @@ def refresh_token(body: RefreshPayload):
         raise HTTPException(status_code=401, detail="Could not refresh session.")
 
     meta = res.user.user_metadata or {} if res.user else {}
+    user_id = str(res.user.id) if res.user else ""
     return {
         "access_token": res.session.access_token,
         "refresh_token": res.session.refresh_token,
-        "user_id": str(res.user.id) if res.user else "",
+        "user_id": user_id,
         "email": res.user.email if res.user else "",
         "display_name": meta.get("display_name", ""),
-        "avatar_url": meta.get("avatar_url", ""),
+        "avatar_url": _get_avatar_from_profile(user_id) if user_id else "",
         "theme_color": meta.get("theme_color", "#3b6ef5"),
         "github_url": meta.get("github_url", ""),
         "linkedin_url": meta.get("linkedin_url", ""),
@@ -178,11 +191,13 @@ def me(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
 
     meta = user.user.user_metadata or {}
+    avatar_url = _get_avatar_from_profile(str(user.user.id))
+
     return {
         "user_id": str(user.user.id),
         "email": user.user.email,
         "display_name": meta.get("display_name", ""),
-        "avatar_url": meta.get("avatar_url", ""),
+        "avatar_url": avatar_url,
         "theme_color": meta.get("theme_color", "#3b6ef5"),
         "github_url": meta.get("github_url", ""),
         "linkedin_url": meta.get("linkedin_url", ""),
@@ -334,7 +349,12 @@ def change_password(body: ChangePasswordPayload, credentials: HTTPAuthorizationC
 # ── Update Profile ─────────────────────────────────────────────────────────────
 @router.post("/avatar")
 async def upload_avatar(file: UploadFile = File(...), credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Upload a profile picture and store as data URI in user metadata."""
+    """Upload a profile picture.
+    
+    IMPORTANT: Avatars are stored in user_profiles table, NOT in user_metadata.
+    Storing base64 in user_metadata bloats the JWT token (240KB+) which causes
+    Cloudflare to reject all API requests with '400 Header Too Large'.
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated.")
 
@@ -352,25 +372,34 @@ async def upload_avatar(file: UploadFile = File(...), credentials: HTTPAuthoriza
     if file.content_type not in allowed:
         raise HTTPException(status_code=400, detail="Only JPEG, PNG, GIF, WebP, and SVG images are allowed.")
 
-    # Read and size-check (max 2 MB)
+    # Read and size-check (max 500 KB to keep DB reasonable)
     contents = await file.read()
-    if len(contents) > 2 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Image must be smaller than 2 MB.")
+    if len(contents) > 500 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be smaller than 500 KB.")
 
     # Convert to data URI
     b64 = base64.b64encode(contents).decode("utf-8")
     data_uri = f"data:{file.content_type};base64,{b64}"
 
-    # Save to user metadata
-    meta = user_resp.user.user_metadata or {}
-    meta["avatar_url"] = data_uri
+    user_id = str(user_resp.user.id)
+
+    # Store avatar in user_profiles table (NOT user_metadata — that bloats JWT)
     try:
-        sb.auth.admin.update_user_by_id(
-            str(user_resp.user.id),
-            {"user_metadata": meta}
-        )
+        sb.table("user_profiles").upsert(
+            {"user_id": user_id, "avatar_url": data_uri},
+            on_conflict="user_id"
+        ).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save avatar: {str(e)}")
+
+    # Also clear any old avatar from user_metadata to keep JWT small
+    try:
+        meta = user_resp.user.user_metadata or {}
+        if meta.get("avatar_url"):
+            meta["avatar_url"] = ""
+            sb.auth.admin.update_user_by_id(user_id, {"user_metadata": meta})
+    except Exception:
+        pass
 
     return {"avatar_url": data_uri, "message": "Avatar uploaded successfully."}
 
@@ -392,8 +421,15 @@ def update_profile(body: UpdateProfilePayload, credentials: HTTPAuthorizationCre
     meta = user_resp.user.user_metadata or {}
     if body.display_name is not None:
         meta["display_name"] = body.display_name
+    # NOTE: avatar_url is stored in user_profiles, NOT user_metadata (to avoid bloating JWT)
     if body.avatar_url is not None:
-        meta["avatar_url"] = body.avatar_url
+        try:
+            sb.table("user_profiles").upsert(
+                {"user_id": str(user_resp.user.id), "avatar_url": body.avatar_url},
+                on_conflict="user_id"
+            ).execute()
+        except Exception:
+            pass
     if body.theme_color is not None:
         meta["theme_color"] = body.theme_color
     if body.github_url is not None:

@@ -1,7 +1,8 @@
 // api.js — centralized API client with Authorization header support
 import { getStoredToken } from '../context/AuthContext'
+import { ENV } from '../config/env'
 
-const BASE = '/api'
+const BASE = ENV.API_URL
 
 async function request(path, options = {}) {
     const token = getStoredToken()

@@ -2,7 +2,7 @@ services:
   # ── Backend: FastAPI (Python Web Service) ──────────────────────────────────
   - type: web
     name: archon-backend
-    runtime: python
+    env: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -45,11 +45,10 @@ services:
   # ── Frontend: React + Vite (Static Site) ──────────────────────────────────
   - type: web
     name: archon-frontend
-    runtime: static
+    env: static
     rootDir: frontend
     buildCommand: npm install && npm run build
-    publishPath: ./dist
-    plan: free
+    staticPublishPath: dist
     envVars:
       # After backend deploys, set this to: https://archon-backend.onrender.com
       - key: VITE_API_URL

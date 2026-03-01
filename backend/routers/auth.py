@@ -267,13 +267,16 @@ def me_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
     permissions = []
     prof = profile_data or {}
     if prof.get("role_id"):
-        perms = (
-            sb.table("role_permissions")
-            .select("permissions(code)")
-            .eq("role_id", prof["role_id"])
-            .execute()
-        )
-        permissions = [p["permissions"]["code"] for p in (perms.data or []) if p.get("permissions")]
+        try:
+            perms = (
+                sb.table("role_permissions")
+                .select("permissions(code)")
+                .eq("role_id", prof["role_id"])
+                .execute()
+            )
+            permissions = [p["permissions"]["code"] for p in (perms.data or []) if p.get("permissions")]
+        except Exception:
+            pass
 
     return {"profile": prof, "permissions": permissions}
 

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Outer glow ring -->
+  <ellipse cx="32" cy="38" rx="22" ry="6" fill="url(#ringGrad)" opacity="0.5"/>
+
+  <!-- Main triangle body -->
+  <polygon points="32,4 6,58 58,58" fill="url(#bodyGrad)" />
+
+  <!-- Inner shadow triangle -->
+  <polygon points="32,14 12,54 52,54" fill="url(#innerGrad)" opacity="0.6"/>
+
+  <!-- Center vertical pillar -->
+  <rect x="29" y="18" width="6" height="36" fill="url(#pillarGrad)" rx="1"/>
+
+  <!-- Left diagonal line -->
+  <line x1="32" y1="10" x2="14" y2="54" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Right diagonal line -->
+  <line x1="32" y1="10" x2="50" y2="54" stroke="url(#lineGrad2)" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Horizontal slash ring (silver arc) -->
+  <ellipse cx="32" cy="30" rx="20" ry="5" stroke="url(#slashGrad)" stroke-width="2.5" fill="none" transform="rotate(-15 32 30)"/>
+
+  <defs>
+    <linearGradient id="bodyGrad" x1="32" y1="4" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e5fa8"/>
+      <stop offset="100%" stop-color="#0d2e5e"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="32" y1="14" x2="32" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2a7dd4"/>
+      <stop offset="100%" stop-color="#0d2e5e" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="pillarGrad" x1="29" y1="18" x2="35" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5ba3e8"/>
+      <stop offset="100%" stop-color="#1e4a8a"/>
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="32" y1="10" x2="14" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7ec8ff"/>
+      <stop offset="100%" stop-color="#1e5fa8"/>
+    </linearGradient>
+    <linearGradient id="lineGrad2" x1="32" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7ec8ff"/>
+      <stop offset="100%" stop-color="#1e5fa8"/>
+    </linearGradient>
+    <linearGradient id="slashGrad" x1="12" y1="25" x2="52" y2="35" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#b0c8e8" stop-opacity="0.2"/>
+      <stop offset="50%" stop-color="#d0dff0"/>
+      <stop offset="100%" stop-color="#b0c8e8" stop-opacity="0.2"/>
+    </linearGradient>
+    <radialGradient id="ringGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3a7fd4" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#0d2e5e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

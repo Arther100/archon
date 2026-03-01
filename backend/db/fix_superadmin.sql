@@ -147,6 +147,11 @@ WHERE u.email = 'arvijay605@gmail.com'
   AND r.name = 'super_admin'
 ON CONFLICT (user_id) DO UPDATE SET role_id = excluded.role_id;
 
+-- ── 8. Reload PostgREST schema cache ─────────────────────────────────────────
+-- This is CRITICAL — without it, PostgREST won't know about the new FKs
+-- and embedded joins will fail silently
+NOTIFY pgrst, 'reload schema';
+
 -- ── Done ─────────────────────────────────────────────────────────────────────
 -- Verify: check that the super_admin profile was set correctly
 SELECT u.email, r.name as role

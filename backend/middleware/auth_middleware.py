@@ -30,24 +30,20 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 
 def get_user_profile(current_user: dict = Depends(get_current_user)):
-    """Fetch user profile with role and organization."""
+    """Fetch user profile with role and organization (separate queries, no embedded joins)."""
     sb = get_supabase()
+    user_id = current_user["id"]
 
-    # Use .limit(1) instead of .maybe_single() to avoid 204 errors
+    # ── Fetch profile (plain query) ─────────────────────────────────────────
+    profile_data = None
     try:
-        result = (
-            sb.table("user_profiles")
-            .select("*, roles(name, description), organizations(id, name, plan_id, subscription_status)")
-            .eq("user_id", current_user["id"])
-            .limit(1)
-            .execute()
-        )
+        result = sb.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
         profile_data = result.data[0] if result.data else None
     except Exception:
-        profile_data = None
+        pass
 
+    # ── Auto-create if missing (upsert to avoid duplicate crash) ────────────
     if not profile_data:
-        # Auto-create profile for first-time users
         role_id = None
         try:
             default_role = sb.table("roles").select("id").eq("name", "developer").limit(1).execute()
@@ -55,39 +51,41 @@ def get_user_profile(current_user: dict = Depends(get_current_user)):
         except Exception:
             pass
 
-        # Auto-assign to default organization (first org, typically super admin's)
         org_id = None
         try:
-            default_org = (
-                sb.table("organizations")
-                .select("id")
-                .order("created_at")
-                .limit(1)
-                .execute()
-            )
+            default_org = sb.table("organizations").select("id").order("created_at").limit(1).execute()
             org_id = default_org.data[0]["id"] if default_org.data else None
         except Exception:
             pass
 
-        new_profile = {
-            "user_id": current_user["id"],
-            "role_id": role_id,
-        }
+        new_profile = {"user_id": user_id, "role_id": role_id}
         if org_id:
             new_profile["organization_id"] = org_id
 
         try:
-            sb.table("user_profiles").insert(new_profile).execute()
-            result = (
-                sb.table("user_profiles")
-                .select("*, roles(name, description), organizations(id, name, plan_id, subscription_status)")
-                .eq("user_id", current_user["id"])
-                .limit(1)
-                .execute()
-            )
+            sb.table("user_profiles").upsert(new_profile, on_conflict="user_id").execute()
+        except Exception:
+            pass
+
+        try:
+            result = sb.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
             profile_data = result.data[0] if result.data else None
         except Exception:
-            profile_data = None
+            pass
+
+    # ── Enrich with role and org data (separate queries) ────────────────────
+    if profile_data and profile_data.get("role_id"):
+        try:
+            role_result = sb.table("roles").select("name, description").eq("id", profile_data["role_id"]).limit(1).execute()
+            profile_data["roles"] = role_result.data[0] if role_result.data else None
+        except Exception:
+            profile_data["roles"] = None
+    if profile_data and profile_data.get("organization_id"):
+        try:
+            org_result = sb.table("organizations").select("id, name, plan_id, subscription_status").eq("id", profile_data["organization_id"]).limit(1).execute()
+            profile_data["organizations"] = org_result.data[0] if org_result.data else None
+        except Exception:
+            profile_data["organizations"] = None
 
     return {**current_user, "profile": profile_data}
 
@@ -99,13 +97,16 @@ def get_user_permissions(user_with_profile: dict = Depends(get_user_profile)):
         return {**user_with_profile, "permissions": []}
 
     sb = get_supabase()
-    perms = (
-        sb.table("role_permissions")
-        .select("permissions(code)")
-        .eq("role_id", profile["role_id"])
-        .execute()
-    )
-    codes = [p["permissions"]["code"] for p in (perms.data or []) if p.get("permissions")]
+    try:
+        rp_result = sb.table("role_permissions").select("permission_id").eq("role_id", profile["role_id"]).execute()
+        perm_ids = [rp["permission_id"] for rp in (rp_result.data or [])]
+        if perm_ids:
+            p_result = sb.table("permissions").select("code").in_("id", perm_ids).execute()
+            codes = [p["code"] for p in (p_result.data or [])]
+        else:
+            codes = []
+    except Exception:
+        codes = []
     return {**user_with_profile, "permissions": codes}
 
 

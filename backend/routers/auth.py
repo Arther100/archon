@@ -211,21 +211,22 @@ def me_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     user_id = str(user.user.id)
 
-    # Fetch user_profile with joined role and org — use .limit(1) to avoid 204 errors
+    # ── Fetch user_profile (plain query — no embedded joins) ────────────────
+    profile_data = None
     try:
         result = (
             sb.table("user_profiles")
-            .select("*, roles(name, description), organizations(id, name, plan_id, subscription_status)")
+            .select("*")
             .eq("user_id", user_id)
             .limit(1)
             .execute()
         )
         profile_data = result.data[0] if result.data else None
     except Exception:
-        profile_data = None
+        pass
 
+    # ── Auto-create profile if missing (upsert to avoid duplicate crash) ────
     if not profile_data:
-        # Auto-create
         role_id = None
         try:
             default_role = sb.table("roles").select("id").eq("name", "developer").limit(1).execute()
@@ -233,16 +234,9 @@ def me_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
         except Exception:
             pass
 
-        # Auto-assign to default organization
         org_id = None
         try:
-            default_org = (
-                sb.table("organizations")
-                .select("id")
-                .order("created_at")
-                .limit(1)
-                .execute()
-            )
+            default_org = sb.table("organizations").select("id").order("created_at").limit(1).execute()
             org_id = default_org.data[0]["id"] if default_org.data else None
         except Exception:
             pass
@@ -250,31 +244,42 @@ def me_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
         new_profile = {"user_id": user_id, "role_id": role_id}
         if org_id:
             new_profile["organization_id"] = org_id
-        sb.table("user_profiles").insert(new_profile).execute()
         try:
-            result = (
-                sb.table("user_profiles")
-                .select("*, roles(name, description), organizations(id, name, plan_id, subscription_status)")
-                .eq("user_id", user_id)
-                .limit(1)
-                .execute()
-            )
+            sb.table("user_profiles").upsert(new_profile, on_conflict="user_id").execute()
+        except Exception:
+            pass
+
+        # Re-fetch
+        try:
+            result = sb.table("user_profiles").select("*").eq("user_id", user_id).limit(1).execute()
             profile_data = result.data[0] if result.data else None
         except Exception:
-            profile_data = None
+            pass
 
-    # Fetch permission codes
-    permissions = []
+    # ── Enrich with role and org data (separate queries) ────────────────────
     prof = profile_data or {}
     if prof.get("role_id"):
         try:
-            perms = (
-                sb.table("role_permissions")
-                .select("permissions(code)")
-                .eq("role_id", prof["role_id"])
-                .execute()
-            )
-            permissions = [p["permissions"]["code"] for p in (perms.data or []) if p.get("permissions")]
+            role_result = sb.table("roles").select("name, description").eq("id", prof["role_id"]).limit(1).execute()
+            prof["roles"] = role_result.data[0] if role_result.data else None
+        except Exception:
+            prof["roles"] = None
+    if prof.get("organization_id"):
+        try:
+            org_result = sb.table("organizations").select("id, name, plan_id, subscription_status").eq("id", prof["organization_id"]).limit(1).execute()
+            prof["organizations"] = org_result.data[0] if org_result.data else None
+        except Exception:
+            prof["organizations"] = None
+
+    # ── Fetch permission codes (separate query) ────────────────────────────
+    permissions = []
+    if prof.get("role_id"):
+        try:
+            rp_result = sb.table("role_permissions").select("permission_id").eq("role_id", prof["role_id"]).execute()
+            perm_ids = [rp["permission_id"] for rp in (rp_result.data or [])]
+            if perm_ids:
+                p_result = sb.table("permissions").select("code").in_("id", perm_ids).execute()
+                permissions = [p["code"] for p in (p_result.data or [])]
         except Exception:
             pass
 

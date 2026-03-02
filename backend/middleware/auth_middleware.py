@@ -42,7 +42,7 @@ def get_user_profile(current_user: dict = Depends(get_current_user)):
     except Exception:
         pass
 
-    # ── Auto-create if missing (upsert to avoid duplicate crash) ────────────
+    # ── Auto-create if missing (INSERT only — never overwrite existing) ──────
     if not profile_data:
         role_id = None
         try:
@@ -63,8 +63,9 @@ def get_user_profile(current_user: dict = Depends(get_current_user)):
             new_profile["organization_id"] = org_id
 
         try:
-            sb.table("user_profiles").upsert(new_profile, on_conflict="user_id").execute()
+            sb.table("user_profiles").insert(new_profile).execute()
         except Exception:
+            # Profile likely already exists — just re-fetch
             pass
 
         try:
@@ -113,6 +114,11 @@ def get_user_permissions(user_with_profile: dict = Depends(get_user_profile)):
 def require_permission(permission_code: str):
     """Factory — returns a dependency that enforces a specific permission."""
     def checker(user_ctx: dict = Depends(get_user_permissions)):
+        # Super admin bypasses all permission checks
+        profile = user_ctx.get("profile") or {}
+        role = profile.get("roles") or {}
+        if role.get("name") == "super_admin":
+            return user_ctx
         if permission_code not in user_ctx.get("permissions", []):
             raise HTTPException(status_code=403, detail=f"Permission denied: {permission_code}")
         return user_ctx
@@ -122,8 +128,8 @@ def require_permission(permission_code: str):
 def require_role(role_name: str):
     """Factory — returns a dependency that enforces a minimum role."""
     def checker(user_ctx: dict = Depends(get_user_profile)):
-        profile = user_ctx.get("profile", {})
-        role = profile.get("roles", {})
+        profile = user_ctx.get("profile") or {}
+        role = profile.get("roles") or {}
         if not role or role.get("name") != role_name:
             # Super admin passes all role checks
             if role and role.get("name") == "super_admin":
@@ -135,8 +141,8 @@ def require_role(role_name: str):
 
 def require_super_admin(user_ctx: dict = Depends(get_user_profile)):
     """Enforce super_admin role."""
-    profile = user_ctx.get("profile", {})
-    role = profile.get("roles", {})
+    profile = user_ctx.get("profile") or {}
+    role = profile.get("roles") or {}
     if not role or role.get("name") != "super_admin":
         raise HTTPException(status_code=403, detail="Super Admin access required.")
     return user_ctx

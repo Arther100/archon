@@ -40,7 +40,7 @@ def list_users(user_ctx: dict = Depends(require_permission("manage_users"))):
     profile = user_ctx.get("profile", {})
     role = profile.get("roles", {})
 
-    query = sb.table("user_profiles").select("*, roles(name), organizations(name)")
+    query = sb.table("user_profiles").select("*, roles(name), organizations!user_profiles_organization_id_fkey(name)")
 
     if role.get("name") != "super_admin":
         org_id = profile.get("organization_id")

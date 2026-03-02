@@ -240,7 +240,7 @@ def me_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except Exception:
         pass
 
-    # ── Auto-create profile if missing (upsert to avoid duplicate crash) ────
+    # ── Auto-create profile if missing (INSERT only — never overwrite existing) ─
     if not profile_data:
         role_id = None
         try:
@@ -260,8 +260,10 @@ def me_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
         if org_id:
             new_profile["organization_id"] = org_id
         try:
-            sb.table("user_profiles").upsert(new_profile, on_conflict="user_id").execute()
+            # Use insert (not upsert) so existing profiles are never overwritten
+            sb.table("user_profiles").insert(new_profile).execute()
         except Exception:
+            # Profile likely already exists — that's fine, just re-fetch
             pass
 
         # Re-fetch

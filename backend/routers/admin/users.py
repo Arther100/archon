@@ -37,8 +37,8 @@ class SendMessagePayload(BaseModel):
 def list_users(user_ctx: dict = Depends(require_permission("manage_users"))):
     """List all user profiles (super_admin sees all, org_admin sees own org)."""
     sb = get_supabase()
-    profile = user_ctx.get("profile", {})
-    role = profile.get("roles", {})
+    profile = user_ctx.get("profile") or {}
+    role = profile.get("roles") or {}
 
     query = sb.table("user_profiles").select("*, roles(name), organizations!user_profiles_organization_id_fkey(name)")
 

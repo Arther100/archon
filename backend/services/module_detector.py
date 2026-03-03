@@ -26,13 +26,15 @@ HEADING_PATTERNS = [
     r"^[A-Z][A-Z /&\-]{5,}$",                              # ALL CAPS (min 6 chars)
     r"^\d+\.\s+[A-Z][^\n]{3,}$",                           # "1. Title" (not "1.1")
     r"^(Module|Section|Chapter|Feature|Appendix)\s*[:\-–\d]",  # keyword headings
-    r"^#{1,2}\s+.+",                                        # Markdown H1/H2 only    # \u2500\u2500 BRD / Requirements Document patterns \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    r"^#{1,2}\s+.+",                                        # Markdown H1/H2 only
+    # ── BRD / Requirements Document patterns ─────────────────────────────
     r"^[A-Z][a-z]+(?:_[A-Z][a-z]+)+\s*$",                  # Entity names: Product_Master, Medicine_Details
     r"^Contents\s+of\s+[A-Z].+$",                           # "Contents of Pharmaceutical Store"
     r"^(?![\u2022\-\*\d\(\s])[A-Z][a-zA-Z\s/&,\-]{8,}:\s*$",  # Title ending with colon (min 10 chars)
     r"^(?:In|Out\s+of)\s+Scope\s*:?\s*$",                   # Scope markers
     r"^Areas\s+of\s+Impact\s*$",                             # Impact / change section
-    r"^[A-Z][\w\s]+[\-\u2013]\s*(?:New|Tile|Existing|Updated)\s*$",  # "Section - New", "Section - Tile"]
+    r"^[A-Z][\w\s]+[\-\u2013]\s*(?:New|Tile|Existing|Updated)\s*$",  # "Section - New", "Section - Tile"
+]
 COMPILED = [re.compile(p, re.MULTILINE) for p in HEADING_PATTERNS]
 
 

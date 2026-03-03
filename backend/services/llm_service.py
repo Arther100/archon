@@ -80,6 +80,13 @@ ABSOLUTE RULES:
    - 'currency'/'amount'/'price' → currency
 9. For API schema — build payload from ACTUAL field list, not generic examples.
 10. Extract ALL fields. Document may have 5, 15, or 50+ fields — get every one of them.
+11. When text contains [REMOVED: ...] markers, the requirement was DELETED or SUPERSEDED — note in gaps.ambiguous as "Removed requirement: original text".
+12. When text defines data entities/schemas with bulleted attributes (e.g., "Product_Master" with "product_id", "product_name"), extract ALL of them into data_entities with full attribute lists and FK relationships.
+13. When text mentions "Future" or "(Future)" next to a feature, include it in scope_out with "Future:" prefix AND in the future_scope list.
+14. When text contains inline questions or discussion comments (e.g., "Can you be more specific?", "Alex to confirm"), extract these as discussion_items.
+15. When text contains "Pending:" sections, extract items in gaps.missing_specs with "Pending:" prefix.
+16. When text has separator lines or entity definitions (Product_Master, Medicine_Details), treat them as distinct logical sections within the module.
+17. Distinguish between CURRENT development items and FUTURE items — tag future_scope items clearly.
 
 FIELD TYPES (use exactly these):
 text | number | dropdown | multi-select | search | date | datetime | boolean | currency | textarea | file | grid | navigation | badge | action-button
@@ -148,13 +155,26 @@ Return ONLY this exact JSON (no markdown, no fences, valid JSON):
     "system_behaviors": ["what system does automatically"],
     "scope_in": ["explicitly in scope"],
     "scope_out": ["explicitly excluded"],
-    "images": ["Image N: what it likely shows based on surrounding context"]
+    "images": ["Image N: what it likely shows based on surrounding context"],
+    "future_scope": ["features explicitly marked as Future or not-yet-implemented"],
+    "data_entities": [
+      {{
+        "entity_name": "ExactNameFromDocument",
+        "description": "purpose of this entity",
+        "attributes": [
+          {{"name": "field_name", "type": "PK|FK|string|ENUM|BOOLEAN|decimal|date", "constraints": "PK/FK/NOT NULL/UNIQUE/ENUM values", "description": "what this stores"}}
+        ],
+        "relationships": ["OtherEntity (FK: linking_field)"]
+      }}
+    ],
+    "discussion_items": ["inline questions, unresolved comments, items needing stakeholder confirmation"]
   }},
   "gaps": {{
     "missing_specs": ["specific missing requirement a developer NEEDS to implement correctly"],
     "ambiguous": ["requirement that is unclear or contradictory"],
     "developer_recommendations": ["concrete recommendation: how a senior dev would solve each gap"],
-    "risk_flags": ["what breaks or goes wrong if this gap is not addressed"]
+    "risk_flags": ["what breaks or goes wrong if this gap is not addressed"],
+    "pending_decisions": ["items explicitly marked as Pending or awaiting confirmation"]
   }},
   "connectivity": {{
     "depends_on": ["ModuleName: reason this module needs data/state from it"],
@@ -353,12 +373,16 @@ def _empty_blueprint() -> dict:
             "system_behaviors": [],
             "scope_in": [],
             "scope_out": [],
+            "future_scope": [],
+            "data_entities": [],
+            "discussion_items": [],
         },
         "gaps": {
             "missing_specs": [],
             "ambiguous": [],
             "developer_recommendations": [],
             "risk_flags": [],
+            "pending_decisions": [],
         },
         "connectivity": {
             "depends_on": [],

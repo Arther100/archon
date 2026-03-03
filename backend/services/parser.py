@@ -14,9 +14,96 @@ For PDF:
 """
 
 import io
+import re
 from typing import List, Dict
 from pdfminer.high_level import extract_text as pdf_extract
 from docx import Document as DocxDocument
+
+
+# ── Formatting & Detection Helpers ────────────────────────────────────────────
+
+def _is_run_strikethrough(run) -> bool:
+    """Check if a DOCX run has strikethrough formatting (indicates removed/superseded requirement)."""
+    try:
+        from docx.oxml.ns import qn
+        rPr = run._element.find(qn('w:rPr'))
+        if rPr is None:
+            return False
+        for tag in ('w:strike', 'w:dstrike'):
+            elem = rPr.find(qn(tag))
+            if elem is not None:
+                val = elem.get(qn('w:val'), 'true')
+                if val.lower() not in ('false', '0', 'off'):
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+def _extract_formatted_text(para) -> str:
+    """
+    Extract paragraph text preserving key formatting as LLM-visible markers:
+    - Strikethrough → [REMOVED: text]  (deleted/superseded requirement)
+    - Bold         → **text**          (emphasis / inline section headers)
+    Falls back to para.text if runs are empty.
+    """
+    if not para.runs:
+        return para.text.strip()
+    parts = []
+    for run in para.runs:
+        text = run.text
+        if not text:
+            continue
+        if _is_run_strikethrough(run):
+            parts.append(f"[REMOVED: {text}]")
+        elif run.bold and len(text.strip()) > 2:
+            parts.append(f"**{text}**")
+        else:
+            parts.append(text)
+    return "".join(parts).strip() or para.text.strip()
+
+
+def _is_separator_line(line: str) -> bool:
+    """Detect horizontal rule / separator lines like '____', '----', '===='."""
+    stripped = line.strip()
+    if len(stripped) < 5:
+        return False
+    unique_chars = set(stripped)
+    return len(unique_chars) <= 2 and unique_chars.issubset({'-', '_', '=', '~', '*', ' '})
+
+
+def _wrap_ascii_tables_in_text(raw_text: str) -> str:
+    """
+    Post-process plain text to detect ASCII-art tables (pipe-delimited rows)
+    and wrap them in [TABLE START]...[TABLE END] markers for LLM awareness.
+    Handles BRD-style inline tables that are NOT real Word/PDF table objects.
+    """
+    lines = raw_text.splitlines()
+    result = []
+    in_table = False
+    table_lines = []
+    for line in lines:
+        stripped = line.strip()
+        is_table_row = stripped.count('|') >= 2 and not stripped.startswith('[TABLE')
+        is_table_sep = bool(re.match(r'^[\s|+\-=]+$', stripped)) and len(stripped) > 5
+        if is_table_row or (is_table_sep and in_table):
+            if not in_table:
+                in_table = True
+                table_lines = []
+            table_lines.append(stripped)
+        else:
+            if in_table and table_lines:
+                result.append("[TABLE START]")
+                result.extend(table_lines)
+                result.append("[TABLE END]")
+                in_table = False
+                table_lines = []
+            result.append(line)
+    if in_table and table_lines:
+        result.append("[TABLE START]")
+        result.extend(table_lines)
+        result.append("[TABLE END]")
+    return "\n".join(result)
 
 
 # ── DOCX Structured Extraction ────────────────────────────────────────────────
@@ -41,7 +128,7 @@ def extract_structured_from_docx(file_bytes: bytes) -> List[Dict]:
             # Paragraph
             from docx.text.paragraph import Paragraph
             para = Paragraph(child, doc)
-            text = para.text.strip()
+            text = _extract_formatted_text(para)
 
             # Check for inline images
             if child.findall('.//' + qn('a:blip')):
@@ -136,5 +223,19 @@ def extract_structured(file_bytes: bytes, file_type: str) -> List[Dict]:
         return extract_structured_from_docx(file_bytes)
     else:
         raw = extract_text_from_pdf(file_bytes)
-        return [{"text": line.strip(), "level": None, "style": "", "is_table": False}
-                for line in raw.splitlines() if line.strip()]
+        # Post-process: detect ASCII tables and separator lines in plain text
+        processed = _wrap_ascii_tables_in_text(raw)
+        paragraphs = []
+        for line in processed.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            is_table = stripped.startswith("[TABLE")
+            is_sep = _is_separator_line(stripped)
+            paragraphs.append({
+                "text": stripped,
+                "level": None,
+                "style": "table" if is_table else ("separator" if is_sep else ""),
+                "is_table": is_table,
+            })
+        return paragraphs

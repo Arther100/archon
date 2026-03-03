@@ -408,7 +408,64 @@ function AnalysisSplitView({ blueprint, isMobile }) {
                     <Section title="System Behaviors" items={doc.system_behaviors} />
                     <Section title="In Scope" items={doc.scope_in} color="#4ade80" />
                     <Section title="Out of Scope" items={doc.scope_out} color="#f87171" />
+                    {!ns(doc.future_scope) && <Section title="🕒 Future Scope" items={doc.future_scope} color="#f59e0b" />}
                 </div>
+
+                {/* Data Entities — BRD schema definitions */}
+                {!ns(doc.data_entities) && (
+                    <div style={{ marginTop: 20, padding: '14px', background: '#0d1219', borderRadius: 10, border: '1px solid #1e2a3d' }}>
+                        <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>🗃️ Data Entities / Schema Definitions</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            {doc.data_entities.map((entity, i) => (
+                                <div key={i} style={{ padding: '10px 12px', background: 'rgba(129,140,248,0.06)', borderRadius: 8, border: '1px solid rgba(129,140,248,0.15)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                        <span style={{ fontWeight: 700, color: '#c7d3e8', fontSize: '0.84rem' }}>{entity.entity_name}</span>
+                                        {entity.description && <span style={{ fontSize: '0.72rem', color: '#4a5568' }}>— {entity.description}</span>}
+                                    </div>
+                                    {entity.attributes && entity.attributes.length > 0 && (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', fontSize: '0.74rem', borderCollapse: 'collapse' }}>
+                                                <thead><tr style={{ borderBottom: '1px solid #1e2a3d' }}>
+                                                    <th style={{ textAlign: 'left', padding: '4px 8px', color: '#4a5568', fontWeight: 600 }}>Attribute</th>
+                                                    <th style={{ textAlign: 'left', padding: '4px 8px', color: '#4a5568', fontWeight: 600 }}>Type</th>
+                                                    <th style={{ textAlign: 'left', padding: '4px 8px', color: '#4a5568', fontWeight: 600 }}>Constraints</th>
+                                                    <th style={{ textAlign: 'left', padding: '4px 8px', color: '#4a5568', fontWeight: 600 }}>Description</th>
+                                                </tr></thead>
+                                                <tbody>{entity.attributes.map((attr, j) => (
+                                                    <tr key={j} style={{ borderBottom: '1px solid rgba(30,42,61,0.5)' }}>
+                                                        <td style={{ padding: '4px 8px', color: '#c7d3e8', fontFamily: 'monospace' }}>{attr.name}</td>
+                                                        <td style={{ padding: '4px 8px', color: '#818cf8' }}>{attr.type}</td>
+                                                        <td style={{ padding: '4px 8px', color: '#f59e0b', fontSize: '0.7rem' }}>{attr.constraints || '—'}</td>
+                                                        <td style={{ padding: '4px 8px', color: '#8896b3' }}>{attr.description || '—'}</td>
+                                                    </tr>
+                                                ))}</tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                    {entity.relationships && entity.relationships.length > 0 && (
+                                        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                            {entity.relationships.map((rel, k) => (
+                                                <span key={k} style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 4, background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}>🔗 {rel}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Discussion Items — inline comments and unresolved questions */}
+                {!ns(doc.discussion_items) && (
+                    <div style={{ marginTop: 16, padding: '14px', background: 'rgba(245,158,11,0.03)', borderRadius: 10, border: '1px solid rgba(245,158,11,0.15)' }}>
+                        <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>💬 Discussion Items / Open Questions</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            {doc.discussion_items.map((item, i) => (
+                                <div key={i} style={{ padding: '7px 11px', background: 'rgba(245,158,11,0.06)', borderRadius: 7, borderLeft: '3px solid rgba(245,158,11,0.3)', fontSize: '0.79rem', color: '#c7d3e8', lineHeight: 1.5 }}>🗨️ {item}</div>
+                            ))}
+                        </div>
+                    </div>
+                )}
                 {hasConn && (
                     <div style={{ marginTop: 20, padding: '14px', background: '#0d1219', borderRadius: 10, border: '1px solid #1e2a3d' }}>
                         <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>🔗 Module Connectivity</p>
@@ -465,6 +522,14 @@ function AnalysisSplitView({ blueprint, isMobile }) {
                                 <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>🚨 Risk Flags</p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                     {gaps.risk_flags.map((s, i) => <div key={i} style={{ padding: '7px 11px', background: 'rgba(167,139,250,0.06)', borderRadius: 7, borderLeft: '3px solid rgba(167,139,250,0.3)', fontSize: '0.79rem', color: '#c7d3e8', lineHeight: 1.5 }}>⚑ {s}</div>)}
+                                </div>
+                            </div>
+                        )}
+                        {!ns(gaps.pending_decisions) && (
+                            <div style={{ marginBottom: 16 }}>
+                                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#fb923c', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>⏳ Pending Decisions</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                    {gaps.pending_decisions.map((s, i) => <div key={i} style={{ padding: '7px 11px', background: 'rgba(251,146,60,0.06)', borderRadius: 7, borderLeft: '3px solid rgba(251,146,60,0.4)', fontSize: '0.79rem', color: '#c7d3e8', lineHeight: 1.5 }}>⏳ {s}</div>)}
                                 </div>
                             </div>
                         )}

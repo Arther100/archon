@@ -271,8 +271,8 @@ The upload process:
 1. Validates file extension (must be PDF or DOCX)
 2. Validates file size (max 20 MB)
 3. Extracts raw text using the parser service:
-   - **DOCX** — preserves paragraph structure, headings, table content (with `[TABLE START/END]` markers), and image placeholders
-   - **PDF** — extracts plain text using pdfminer
+   - **DOCX** — preserves paragraph structure, headings, table content (with `[TABLE START/END]` markers), image placeholders, **strikethrough text** (wrapped as `[REMOVED: text]` to indicate deleted/superseded requirements), and **bold text** (wrapped as `**text**` for emphasis markers)
+   - **PDF** — extracts plain text using pdfminer, then **post-processes** to detect ASCII-art tables (pipe-delimited rows) and wrap them in `[TABLE START/END]` markers, and identifies separator lines (`____`, `----`) for section boundary hints
 4. Detects modules using the module detector service
 5. Inserts a `documents` row with the raw text
 6. Inserts `modules` rows for each detected section
@@ -288,6 +288,14 @@ Module detection is **purely deterministic** (no LLM involved):
   - Top-level numbered sections (e.g., "1. Introduction", "2. Requirements") — but NOT sub-numbered like "1.1" or "1.2"
   - Common section keywords (e.g., "Module:", "Section:", "Chapter:", "Feature:", "Appendix:")
   - Markdown-style headings (`# Title` or `## Title`)
+  - **BRD-specific patterns (Business Requirements Documents):**
+    - Entity/schema names in PascalCase or snake_case (e.g., `Product_Master`, `Medicine_Details`)
+    - "Contents of X" headers (e.g., "Contents of Pharmaceutical Store")
+    - Title-case lines ending with a colon (e.g., "Seller Console - Stores:", "Batch Creation Form Fields:")
+    - Scope markers ("In Scope", "Out of Scope")
+    - Impact sections ("Areas of Impact")
+    - Section-with-qualifier patterns (e.g., "Store Registration - New", "Product Management - Tile")
+  - **Separator-aware detection:** Horizontal rules (`________`, `------`, `======`) act as section boundary hints — any title-case line immediately following a separator is treated as a heading, even if it doesn't match any other pattern
 - Each module gets a title and its associated content text.
 
 ##### What Happens When a Document Has No Structure at All
@@ -309,6 +317,8 @@ This is a critical fallback path. When a document is plain text with no headings
 | DOCX with Heading 1 styles | Splits cleanly on each H1 | Multiple (one per H1) |
 | DOCX with no heading styles but ALL CAPS sections | Regex splits on ALL CAPS lines | Multiple |
 | PDF with numbered sections ("1. User Management") | Regex splits on numbered headings | Multiple |
+| **BRD with entity definitions and separators** | **Splits on entity names (Product_Master), title-with-colon patterns, scope markers, and separator-delimited sections** | **Multiple** |
+| **BRD with discussion comments and strikethrough** | **Formats strikethrough as [REMOVED:], extracts inline questions as discussion_items** | **Multiple** |
 | Plain text email paste, no structure at all | Entire content → "Full Document" | 1 |
 | PDF with only body text paragraphs | Entire content → "Full Document" | 1 |
 | DOCX with only Heading 2/3 (no Heading 1) | Regex fallback on the text | Depends on regex matches |
@@ -337,8 +347,8 @@ This is the core value proposition. For each module:
 9. Store in the `analyses` table with version number
 
 **The output blueprint structure:**
-- **Documented** — summary, business_goal, business_flow, fields (with label, type, required, description, validation, **input_type**), functional_rules, user_actions, system_behaviors, scope_in, scope_out
-- **Gaps** — missing_specs, ambiguous requirements, developer_recommendations, risk_flags
+- **Documented** — summary, business_goal, business_flow, fields (with label, type, required, description, validation, **input_type**), functional_rules, user_actions, system_behaviors, scope_in, scope_out, **future_scope** (features marked as "Future"), **data_entities** (extracted DB schema definitions with attributes, types, constraints, and FK relationships), **discussion_items** (inline questions and unresolved comments from the document)
+- **Gaps** — missing_specs, ambiguous requirements, developer_recommendations, risk_flags, **pending_decisions** (items marked as "Pending" or awaiting stakeholder confirmation)
 - **Connectivity** — depends_on, provides_to, shared_fields, **integration_points** (external systems the module must integrate with)
 - **API Schema** — resource name, base endpoint, and full REST operations (GET/POST/PUT/DELETE with paths, descriptions, request bodies, response schemas)
 

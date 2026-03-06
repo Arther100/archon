@@ -1,6 +1,7 @@
 // AnalysisPage — Archon: Requirement-to-Architecture Blueprint Engine
 // Tabs: Analysis (split doc/gaps) | Fields (section-grouped) | API Schema (editable + download)
 import { useState, useEffect, useRef, useCallback } from 'react'
+import TestCasesView from './TestCasesView'
 import { useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../../hooks/api'
@@ -1137,6 +1138,7 @@ export default function AnalysisPage() {
         { id: 'connectivity', icon: '🔗', label: 'Connectivity' },
         { id: 'history', icon: '🕰', label: 'History' },
         { id: 'chat', icon: '💬', label: 'Chat' },
+        { id: 'testcases', icon: '🧪', label: 'Test Cases' },
     ]
 
     if (initLoading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 70px)' }}><div className="spinner" style={{ width: 36, height: 36 }} /></div>
@@ -1208,10 +1210,13 @@ export default function AnalysisPage() {
                             <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} accent={accent} />
 
                             {/* Content area */}
+
                             {activeTab === 'chat' ? (
                                 <QAChatFullView documentId={documentId} activeModule={activeModule} isMobile={isMobile} />
                             ) : activeTab === 'connectivity' ? (
                                 <ConnectivityMapView documentId={documentId} />
+                            ) : activeTab === 'testcases' ? (
+                                <TestCasesView testCases={blueprint?.test_cases || []} />
                             ) : loading ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
                                     <div className="spinner" style={{ width: 38, height: 38 }} />

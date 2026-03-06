@@ -538,14 +538,57 @@ async def analyse_module(
     if use_cache:
         put_cached(text, provider, model_name, blueprint, total_input, total_output, cost)
 
+
+    # ── Generate test case summaries for UI tab ──
+    def generate_test_cases(bp):
+      documented = bp.get("documented", {})
+      business_flows = documented.get("business_flow", [])
+      user_actions = documented.get("user_actions", [])
+      fields = documented.get("fields", [])
+      test_cases = []
+      # 1. Business flow test cases
+      for i, flow in enumerate(business_flows):
+        test_cases.append({
+          "title": f"Business Flow Step {i+1}",
+          "description": flow,
+          "steps": [flow],
+          "expected_result": "As described in the business flow."
+        })
+      # 2. User action test cases
+      for i, action in enumerate(user_actions):
+        test_cases.append({
+          "title": f"User Action {i+1}",
+          "description": action,
+          "steps": [action],
+          "expected_result": "Action is performed successfully."
+        })
+      # 3. Field-level test cases (basic validation)
+      for f in fields:
+        label = f.get("label") or f.get("name")
+        if not label:
+          continue
+        test_cases.append({
+          "title": f"Field Validation: {label}",
+          "description": f"Validate the field '{label}' as per requirements.",
+          "steps": [
+            f"Enter valid and invalid values for '{label}'.",
+            "Check required/optional status.",
+            f"Check validation: {f.get('validation', 'Not specified')}"
+          ],
+          "expected_result": f"Field '{label}' accepts only valid input and enforces all rules."
+        })
+      return test_cases
+
+    blueprint["test_cases"] = generate_test_cases(blueprint)
+
     # Attach token usage metadata
     blueprint["_token_usage"] = {
-        "input_tokens": total_input,
-        "output_tokens": total_output,
-        "cost_usd": round(cost, 6),
-        "cache_hit": False,
-        "provider": provider,
-        "model": model_name,
+      "input_tokens": total_input,
+      "output_tokens": total_output,
+      "cost_usd": round(cost, 6),
+      "cache_hit": False,
+      "provider": provider,
+      "model": model_name,
     }
 
     return blueprint

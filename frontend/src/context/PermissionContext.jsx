@@ -68,6 +68,7 @@ export function PermissionProvider({ children }) {
         // ── User menus — always visible, enabled based on permission ──
         { key: 'upload', label: t('sidebar.upload'), icon: '📤', path: '/', show: true, enabled: hasPermission('upload_doc') || true },
         { key: 'documents', label: t('sidebar.documents'), icon: '📄', path: '/documents', show: true, enabled: hasPermission('view_analysis') || true },
+        { key: 'projects', label: t('sidebar.projects') || 'Projects', icon: '📁', path: '/projects', show: true, enabled: true },
         { key: 'dashboard', label: t('sidebar.dashboard'), icon: '📊', path: '/dashboard', show: true, enabled: hasPermission('view_dashboard') },
         { key: 'ai-settings', label: t('sidebar.aiSettings'), icon: '🔑', path: '/ai-settings', show: true, enabled: hasPermission('change_model') },
         { key: 'feedback', label: t('sidebar.feedback'), icon: '💬', path: '/feedback', show: true, enabled: hasPermission('submit_feedback') },

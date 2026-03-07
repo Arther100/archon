@@ -121,6 +121,7 @@ export default {
     sidebar: {
         upload: 'Upload',
         documents: 'Documents',
+        projects: 'Projects',
         dashboard: 'Dashboard',
         aiSettings: 'AI Settings',
         feedback: 'Feedback',

@@ -16,7 +16,7 @@ _APP_VERSION = _version_info.get('version', '0.0.0')
 _APP_CODENAME = _version_info.get('codename', 'Archon')
 
 # ── Existing routers ─────────────────────────────────────────────────────────
-from routers import upload, documents, analysis, qa, dependencies, auth
+from routers import upload, documents, analysis, qa, dependencies, auth, projects
 
 # ── New SaaS routers ─────────────────────────────────────────────────────────
 from routers import feedback, notifications, ai_settings
@@ -58,6 +58,7 @@ app.include_router(analysis.router)
 app.include_router(qa.router)
 app.include_router(dependencies.router)
 app.include_router(auth.router)
+app.include_router(projects.router)
 
 # ── SaaS Routers ─────────────────────────────────────────────────────────────
 app.include_router(feedback.router)

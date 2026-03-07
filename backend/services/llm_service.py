@@ -48,9 +48,12 @@ Output JSON schema:
 import json
 import asyncio
 import re
+import logging
 from config import settings
 from services.cache_service import get_cached, put_cached
 from services.token_service import log_usage, calculate_cost
+
+logger = logging.getLogger(__name__)
 
 # ── Chunking constants ────────────────────────────────────────────────────────
 CHUNK_CHAR_LIMIT = 10_000
@@ -87,6 +90,9 @@ ABSOLUTE RULES:
 15. When text contains "Pending:" sections, extract items in gaps.missing_specs with "Pending:" prefix.
 16. When text has separator lines or entity definitions (Product_Master, Medicine_Details), treat them as distinct logical sections within the module.
 17. Distinguish between CURRENT development items and FUTURE items — tag future_scope items clearly.
+18. When text contains [JSON START]...[JSON END] blocks, extract the data schema structure as data_entities with full attribute lists and types.
+19. When analysing attached images, describe visual content (tables, flowcharts, diagrams, screenshots) and extract any visible text, field names, or data structures into the appropriate blueprint sections.
+20. Generate an implementation_guide section: provide a developer-oriented summary of HOW to build this module — setup steps, key components to create, integration points, and testing strategy. Think like a tech lead onboarding a new developer.
 
 FIELD TYPES (use exactly these):
 text | number | dropdown | multi-select | search | date | datetime | boolean | currency | textarea | file | grid | navigation | badge | action-button
@@ -115,7 +121,7 @@ MODULE TEXT (includes tables, paragraphs, and image markers — analyse ALL of i
 \"\"\"
 
 {standards_section}
-
+{project_section}
 CRITICAL — FIELD EXTRACTION RULES (follow strictly):
 1. Scan EVERY line including [TABLE START]...[TABLE END] blocks
 2. Each TABLE ROW is a separate field — extract every single one
@@ -167,7 +173,14 @@ Return ONLY this exact JSON (no markdown, no fences, valid JSON):
         "relationships": ["OtherEntity (FK: linking_field)"]
       }}
     ],
-    "discussion_items": ["inline questions, unresolved comments, items needing stakeholder confirmation"]
+    "discussion_items": ["inline questions, unresolved comments, items needing stakeholder confirmation"],
+    "implementation_guide": {{
+      "overview": "High-level developer summary: what to build, key architecture decisions, tech stack recommendations",
+      "setup_steps": ["Step 1: ...", "Step 2: ..."],
+      "key_components": ["Component/service needed and its responsibility"],
+      "integration_points": ["External system or API this module must integrate with"],
+      "testing_strategy": "How to test this module — unit tests, integration tests, edge cases to cover"
+    }}
   }},
   "gaps": {{
     "missing_specs": ["specific missing requirement a developer NEEDS to implement correctly"],
@@ -233,11 +246,14 @@ Return ONLY this exact JSON (no markdown, no fences, valid JSON):
 }}
 
 CONFIDENCE SCORE RULE: Set "confidence_score" (integer 0-100) at the END of the JSON.
-- 90-100: Document is extremely detailed — every field, rule, and behavior is explicitly stated.
-- 70-89:  Most fields and rules are present but some validation details are missing.
-- 50-69:  Moderate — core flow is described but significant specs are absent.
-- 30-49:  Sparse — high-level description only, many fields inferred.
-- 0-29:   Very vague — almost nothing is explicitly specified."""
+This measures how confident YOU are that the ANALYSIS IS COMPLETE AND ACCURATE:
+- 90-100: You extracted every field, rule, flow, and behavior — nothing was missed or ambiguous.
+- 75-89:  You extracted most content accurately but a few details may be inferred or partially unclear.
+- 60-74:  Core analysis is solid but noticeable sections lacked detail in the source.
+- 40-59:  Significant portions of the document were vague; analysis required heavy inference.
+- 0-39:   Very little extractable content — mostly guesswork.
+Do NOT penalise yourself for missing validation rules if the document simply doesn't state them.
+Focus on: Did I find all fields? All flows? All rules? All entities? If yes → score high."""
 
 
 MERGE_PROMPT = """You are merging multiple chunk analyses of the same large module into one coherent blueprint.
@@ -258,17 +274,29 @@ Merge into a single JSON blueprint. Rules:
 
 # ── LLM Callers ───────────────────────────────────────────────────────────────
 
-async def _call_openai(system: str, user: str) -> tuple[str, dict]:
+async def _call_openai(system: str, user: str, images: list = None) -> tuple[str, dict]:
     from openai import AsyncOpenAI
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    # Build user message — multimodal if images are provided
+    if images:
+        user_content = [{"type": "text", "text": user}]
+        for img in images:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{img['mime']};base64,{img['data']}", "detail": "low"}
+            })
+    else:
+        user_content = user
+
     resp = await client.chat.completions.create(
         model=settings.OPENAI_MODEL,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user", "content": user},
+            {"role": "user", "content": user_content},
         ],
         temperature=0,
-        max_tokens=4000,
+        max_tokens=16384,
         response_format={"type": "json_object"},
     )
     usage = {
@@ -278,13 +306,25 @@ async def _call_openai(system: str, user: str) -> tuple[str, dict]:
     return resp.choices[0].message.content.strip(), usage
 
 
-async def _call_gemini(system: str, user: str) -> tuple[str, dict]:
+async def _call_gemini(system: str, user: str, images: list = None) -> tuple[str, dict]:
     import google.generativeai as genai
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel(settings.GEMINI_MODEL)
     full_prompt = f"{system}\n\n{user}\n\nReturn ONLY valid JSON."
+
+    generation_config = genai.types.GenerationConfig(max_output_tokens=16384)
+
+    # Build content parts — multimodal if images are provided
+    parts = [full_prompt]
+    if images:
+        import base64
+        for img in images:
+            parts.append(genai.types.Part.from_data(data=base64.b64decode(img['data']), mime_type=img['mime']))
+
     loop = asyncio.get_event_loop()
-    resp = await loop.run_in_executor(None, model.generate_content, full_prompt)
+    resp = await loop.run_in_executor(
+        None, lambda: model.generate_content(parts, generation_config=generation_config)
+    )
     text = resp.text.strip()
     # Estimate tokens (Gemini doesn't always return usage)
     usage = {
@@ -294,7 +334,7 @@ async def _call_gemini(system: str, user: str) -> tuple[str, dict]:
     return text, usage
 
 
-async def _call_ollama(system: str, user: str) -> tuple[str, dict]:
+async def _call_ollama(system: str, user: str, images: list = None) -> tuple[str, dict]:
     import httpx
     payload = {
         "model": settings.OLLAMA_MODEL,
@@ -316,15 +356,15 @@ async def _call_ollama(system: str, user: str) -> tuple[str, dict]:
         return text, usage
 
 
-async def _llm(system: str, user: str) -> tuple[str, dict]:
-    """Call LLM and return (raw_text, usage_dict)."""
+async def _llm(system: str, user: str, images: list = None) -> tuple[str, dict]:
+    """Call LLM and return (raw_text, usage_dict). Optionally pass images for vision."""
     provider = settings.LLM_PROVIDER.lower()
     if provider == "openai":
-        return await _call_openai(system, user)
+        return await _call_openai(system, user, images=images)
     elif provider == "gemini":
-        return await _call_gemini(system, user)
+        return await _call_gemini(system, user, images=images)
     elif provider == "ollama":
-        return await _call_ollama(system, user)
+        return await _call_ollama(system, user, images=images)
     else:
         raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
 
@@ -346,16 +386,51 @@ def _extract_json(raw: str) -> dict:
 # ── Chunker ───────────────────────────────────────────────────────────────────
 
 def _chunk_text(text: str) -> list[str]:
+    """Split text into chunks respecting [TABLE START]...[TABLE END] and [JSON START]...[JSON END] boundaries."""
     if len(text) <= CHUNK_CHAR_LIMIT:
         return [text]
+
+    # Find all protected block ranges (tables and JSON blocks)
+    protected_ranges = []
+    for marker_start, marker_end in [("[TABLE START]", "[TABLE END]"), ("[JSON START]", "[JSON END]")]:
+        pos = 0
+        while True:
+            s = text.find(marker_start, pos)
+            if s == -1:
+                break
+            e = text.find(marker_end, s)
+            if e == -1:
+                e = len(text)
+            else:
+                e += len(marker_end)
+            protected_ranges.append((s, e))
+            pos = e
+
+    def _is_inside_protected(idx):
+        return any(s <= idx < e for s, e in protected_ranges)
+
+    def _find_safe_break(target):
+        """Find a line break near target that doesn't split a protected block."""
+        # Search backward from target for a newline outside protected ranges
+        for offset in range(0, min(CHUNK_OVERLAP, target)):
+            pos = target - offset
+            if pos < 0:
+                break
+            if text[pos] == '\n' and not _is_inside_protected(pos):
+                return pos + 1
+        # If no safe break found, use target as-is
+        return target
+
     chunks = []
     start = 0
     while start < len(text):
-        end = min(start + CHUNK_CHAR_LIMIT, len(text))
-        chunks.append(text[start:end])
-        if end == len(text):
+        if len(text) - start <= CHUNK_CHAR_LIMIT:
+            chunks.append(text[start:])
             break
-        start = end - CHUNK_OVERLAP
+        end = start + CHUNK_CHAR_LIMIT
+        end = _find_safe_break(end)
+        chunks.append(text[start:end])
+        start = max(start + 1, end - CHUNK_OVERLAP)
     return chunks
 
 
@@ -376,6 +451,13 @@ def _empty_blueprint() -> dict:
             "future_scope": [],
             "data_entities": [],
             "discussion_items": [],
+            "implementation_guide": {
+                "overview": "Not specified in the document",
+                "setup_steps": [],
+                "key_components": [],
+                "integration_points": [],
+                "testing_strategy": "Not specified in the document",
+            },
         },
         "gaps": {
             "missing_specs": [],
@@ -429,6 +511,8 @@ async def analyse_module(
     module_id: str = None,
     document_id: str = None,
     organization_id: str = None,
+    images: list = None,
+    project_context: str = None,
 ) -> dict:
     """
     Full blueprint analysis of a module.
@@ -436,6 +520,7 @@ async def analyse_module(
 
     Cache layer: checks for cached result first (SHA-256 hash of text+provider+model).
     Token layer: logs every LLM call with full metadata.
+    images: optional list of {"data": base64_string, "mime": mime_type} for vision analysis.
     """
     text = module_text.strip()
     provider = settings.LLM_PROVIDER.lower()
@@ -478,19 +563,34 @@ async def analyse_module(
 \"\"\"
 """
 
+    project_section = ""
+    if project_context and project_context.strip():
+        project_section = f"""
+PROJECT CONTEXT — Other modules in the same project (use this to understand cross-module connectivity and full system flow):
+\"\"\"
+{project_context.strip()[:4000]}
+\"\"\"
+Use this context to accurately fill connectivity.depends_on, connectivity.provides_to, and connectivity.shared_fields.
+"""
+
     chunks = _chunk_text(text)
     total_input = 0
     total_output = 0
 
+    # Use images from parameter for vision-capable LLM calls
+    parse_warnings = []
+
     if len(chunks) == 1:
         # Fast path
-        prompt = BLUEPRINT_PROMPT.format(module_text=text, standards_section=standards_section)
-        raw, usage = await _llm(SYSTEM_PROMPT, prompt)
+        prompt = BLUEPRINT_PROMPT.format(module_text=text, standards_section=standards_section, project_section=project_section)
+        raw, usage = await _llm(SYSTEM_PROMPT, prompt, images=images)
         total_input += usage.get("input_tokens", 0)
         total_output += usage.get("output_tokens", 0)
         try:
             blueprint = _extract_json(raw)
-        except Exception:
+        except Exception as e:
+            logger.error("Failed to parse LLM JSON response: %s | Raw (first 500 chars): %s", str(e), raw[:500] if raw else "(empty)")
+            parse_warnings.append(f"LLM output could not be parsed as JSON: {str(e)}")
             blueprint = _empty_blueprint()
     else:
         # Chunked path — analyse each chunk, merge
@@ -499,17 +599,22 @@ async def analyse_module(
             prompt = BLUEPRINT_PROMPT.format(
                 module_text=f"[Part {i+1} of {len(chunks)}]\n\n{chunk}",
                 standards_section=standards_section if i == 0 else "",
+                project_section=project_section if i == 0 else "",
             )
             try:
-                raw, usage = await _llm(SYSTEM_PROMPT, prompt)
+                raw, usage = await _llm(SYSTEM_PROMPT, prompt, images=images if i == 0 else None)
                 total_input += usage.get("input_tokens", 0)
                 total_output += usage.get("output_tokens", 0)
                 parsed = _extract_json(raw)
                 chunk_results.append(parsed)
-            except Exception:
+            except Exception as e:
+                logger.warning("Chunk %d/%d parse failed: %s", i + 1, len(chunks), str(e))
+                parse_warnings.append(f"Chunk {i+1}/{len(chunks)} failed: {str(e)}")
                 continue
 
         if not chunk_results:
+            logger.error("All chunks failed to parse — returning empty blueprint")
+            parse_warnings.append("All analysis chunks failed to produce valid JSON")
             blueprint = _empty_blueprint()
         else:
             blueprint = chunk_results[0]
@@ -517,6 +622,9 @@ async def analyse_module(
                 for top_key in ["documented", "gaps", "connectivity"]:
                     if top_key in chunk and top_key in blueprint:
                         blueprint[top_key] = _merge_dicts(blueprint[top_key], chunk[top_key])
+
+    if parse_warnings:
+        blueprint["_parse_warnings"] = parse_warnings
 
     # ── Calculate cost + log ──────────────────────────────────────────────
     cost = calculate_cost(total_input, total_output, provider, model_name)

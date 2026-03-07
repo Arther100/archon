@@ -23,18 +23,88 @@ router = APIRouter(prefix="/modules", tags=["Analysis"])
 def compute_accuracy(blueprint: dict) -> int:
     """
     Compute a server-side accuracy score (0-100).
-    Based on: % of fields with real validation rules, penalised by gap count.
+    Multi-factor score measuring how thoroughly the analysis extracted content:
+      - 35%: Field quality (type assigned, description present, validation present)
+      - 20%: Core sections filled (summary, business_goal, business_flow)
+      - 15%: Behavioral coverage (user_actions, system_behaviors, functional_rules)
+      - 15%: Engineering depth (connectivity, data_entities, api_schema usable)
+      - 15%: Completeness bonus — penalised by gap ratio
     """
-    fields = blueprint.get("documented", {}).get("fields", [])
-    if not fields:
-        return 0
-    ns_phrases = {"not specified in the document", "not specified", "", None}
-    fields_with_validation = sum(
-        1 for f in fields
-        if str(f.get("validation", "") or "").strip().lower() not in ns_phrases
+    doc = blueprint.get("documented", {})
+    gaps = blueprint.get("gaps", {})
+    conn = blueprint.get("connectivity", {})
+    api_schema = blueprint.get("api_schema", {})
+    ns_phrases = {"not specified in the document", "not specified", "", "unknown", None}
+
+    def _is_filled(val):
+        if val is None:
+            return False
+        if isinstance(val, str):
+            return val.strip().lower() not in ns_phrases
+        if isinstance(val, list):
+            return len(val) > 0
+        if isinstance(val, dict):
+            return len(val) > 0
+        return bool(val)
+
+    # ── 1. Field quality (35%) ────────────────────────────────────────────
+    fields = doc.get("fields", [])
+    if fields:
+        field_scores = []
+        for f in fields:
+            pts = 0
+            if _is_filled(f.get("type")):         pts += 30  # type assigned
+            if _is_filled(f.get("description")):   pts += 30  # description present
+            if _is_filled(f.get("label")):          pts += 15  # label present
+            if _is_filled(f.get("validation")):     pts += 15  # validation present
+            if _is_filled(f.get("section")):        pts += 10  # section grouping
+            field_scores.append(pts)
+        field_pct = sum(field_scores) / len(field_scores)
+    else:
+        field_pct = 0
+
+    # ── 2. Core sections (20%) ────────────────────────────────────────────
+    core_checks = [
+        _is_filled(doc.get("summary")),
+        _is_filled(doc.get("business_goal")),
+        _is_filled(doc.get("business_flow")),
+    ]
+    core_pct = (sum(core_checks) / len(core_checks)) * 100
+
+    # ── 3. Behavioral coverage (15%) ──────────────────────────────────────
+    behavior_checks = [
+        _is_filled(doc.get("user_actions")),
+        _is_filled(doc.get("system_behaviors")),
+        _is_filled(doc.get("functional_rules")),
+    ]
+    behavior_pct = (sum(behavior_checks) / len(behavior_checks)) * 100
+
+    # ── 4. Engineering depth (15%) ────────────────────────────────────────
+    eng_checks = [
+        _is_filled(conn.get("depends_on")) or _is_filled(conn.get("provides_to")),
+        _is_filled(doc.get("data_entities")),
+        _is_filled(api_schema.get("resource")) and api_schema.get("resource", "").lower() not in ns_phrases,
+        _is_filled(doc.get("implementation_guide")),
+    ]
+    eng_pct = (sum(eng_checks) / len(eng_checks)) * 100
+
+    # ── 5. Completeness bonus (15%) — penalised by gap ratio ──────────────
+    total_content = len(fields) + len(doc.get("functional_rules", [])) + len(doc.get("user_actions", []))
+    gap_count = len(gaps.get("missing_specs", []))
+    if total_content > 0:
+        gap_ratio = gap_count / max(total_content, 1)
+        completeness_pct = max(0, (1 - gap_ratio) * 100)
+    else:
+        completeness_pct = 0
+
+    # ── Weighted total ────────────────────────────────────────────────────
+    raw = (
+        field_pct * 0.35 +
+        core_pct * 0.20 +
+        behavior_pct * 0.15 +
+        eng_pct * 0.15 +
+        completeness_pct * 0.15
     )
-    gap_count = len(blueprint.get("gaps", {}).get("missing_specs", []))
-    raw = (fields_with_validation / len(fields)) * 100 - (gap_count * 3)
     return max(0, min(100, round(raw)))
 
 
@@ -47,7 +117,7 @@ async def trigger_analysis(module_id: str, request: Request, force: bool = Query
 
     module = (
         sb.table("modules")
-        .select("id, title, content, document_id, documents(standards_text)")
+        .select("id, title, content, document_id, image_data, documents(standards_text, project_id)")
         .eq("id", module_id)
         .execute()
     )
@@ -62,6 +132,60 @@ async def trigger_analysis(module_id: str, request: Request, force: bool = Query
     if mod.get("documents") and mod["documents"].get("standards_text"):
         standards = mod["documents"]["standards_text"]
 
+    # Build project context — sibling module summaries for cross-document AI understanding
+    project_context = None
+    if mod.get("documents") and mod["documents"].get("project_id"):
+        project_id = mod["documents"]["project_id"]
+        # Get all documents in the same project
+        sibling_docs = (
+            sb.table("documents")
+            .select("id, file_name")
+            .eq("project_id", project_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
+        sibling_doc_ids = [d["id"] for d in (sibling_docs.data or [])]
+        if sibling_doc_ids:
+            # Get all sibling modules (excluding current one)
+            sibling_modules = (
+                sb.table("modules")
+                .select("id, title, document_id, \"order\"")
+                .in_("document_id", sibling_doc_ids)
+                .neq("id", module_id)
+                .order("order")
+                .execute()
+            )
+            doc_name_map = {d["id"]: d["file_name"] for d in sibling_docs.data}
+            context_parts = []
+            for sm in (sibling_modules.data or []):
+                analysis_row = (
+                    sb.table("analyses")
+                    .select("output_json")
+                    .eq("module_id", sm["id"])
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                summary = ""
+                if analysis_row.data:
+                    bp = analysis_row.data[0].get("output_json") or {}
+                    summary = bp.get("documented", {}).get("summary", "")
+                doc_name = doc_name_map.get(sm["document_id"], "")
+                context_parts.append(
+                    f"[{doc_name}] {sm['title']}"
+                    + (f": {summary}" if summary else "")
+                )
+            if context_parts:
+                project_context = "\n".join(context_parts[:30])  # Limit to 30 modules
+
+    # Extract images stored during upload (JSON string of base64 images)
+    images = None
+    if mod.get("image_data"):
+        try:
+            images = json.loads(mod["image_data"]) if isinstance(mod["image_data"], str) else mod["image_data"]
+        except (json.JSONDecodeError, TypeError):
+            images = None
+
     # Extract user context from request state (set by auth middleware)
     user_id = getattr(request.state, "user_id", None) if hasattr(request, "state") else None
     org_id = getattr(request.state, "organization_id", None) if hasattr(request, "state") else None
@@ -75,6 +199,8 @@ async def trigger_analysis(module_id: str, request: Request, force: bool = Query
             module_id=module_id,
             document_id=mod.get("document_id"),
             organization_id=org_id,
+            images=images,
+            project_context=project_context,
         )
     except Exception as e:
         err = str(e)

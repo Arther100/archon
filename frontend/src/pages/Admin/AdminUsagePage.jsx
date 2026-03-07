@@ -41,12 +41,8 @@ export default function AdminUsagePage() {
                         <div style={valueStyle}>{summary.total_tokens_used?.toLocaleString()}</div>
                     </div>
                     <div style={cardStyle}>
-                        <div style={labelStyle}>Near Limit (90%+)</div>
-                        <div style={{ ...valueStyle, color: summary.users_near_limit_90 > 0 ? '#f59e0b' : '#22c55e' }}>{summary.users_near_limit_90}</div>
-                    </div>
-                    <div style={cardStyle}>
-                        <div style={labelStyle}>Over Limit</div>
-                        <div style={{ ...valueStyle, color: summary.users_over_limit > 0 ? '#ef4444' : '#22c55e' }}>{summary.users_over_limit}</div>
+                        <div style={labelStyle}>Total Requests</div>
+                        <div style={valueStyle}>{summary.total_requests?.toLocaleString()}</div>
                     </div>
                 </div>
             )}
@@ -57,33 +53,29 @@ export default function AdminUsagePage() {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr>
-                                <th style={thStyle}>User ID</th>
+                                <th style={thStyle}>User</th>
+                                <th style={thStyle}>Role</th>
+                                <th style={thStyle}>Organization</th>
                                 <th style={thStyle}>Tokens Used</th>
-                                <th style={thStyle}>Monthly Limit</th>
-                                <th style={thStyle}>Remaining</th>
-                                <th style={thStyle}>Usage %</th>
+                                <th style={thStyle}>Requests</th>
+                                <th style={thStyle}>Last Active</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {users.map(u => {
-                                const pct = u.monthly_limit > 0 ? Math.round((u.tokens_used / u.monthly_limit) * 100) : 0
-                                return (
+                            {users.map(u => (
                                     <tr key={u.user_id}>
-                                        <td style={tdStyle}><span style={{ fontSize: '0.72rem', fontFamily: "'JetBrains Mono',monospace" }}>{u.user_id?.slice(0, 12)}...</span></td>
-                                        <td style={tdStyle}>{u.tokens_used?.toLocaleString()}</td>
-                                        <td style={tdStyle}>{u.monthly_limit?.toLocaleString()}</td>
-                                        <td style={tdStyle}>{u.remaining_tokens?.toLocaleString()}</td>
                                         <td style={tdStyle}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <div style={{ flex: 1, background: '#0d1219', borderRadius: 99, height: 6, overflow: 'hidden' }}>
-                                                    <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 99, background: pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : accent }} />
-                                                </div>
-                                                <span style={{ fontSize: '0.72rem', color: pct >= 90 ? '#ef4444' : '#8896b3', minWidth: 35 }}>{pct}%</span>
+                                            <div>
+                                                <span style={{ fontSize: '0.8rem', color: '#f0f4ff' }}>{u.email || u.user_id?.slice(0, 12)}</span>
                                             </div>
                                         </td>
+                                        <td style={tdStyle}><span style={{ fontSize: '0.72rem', color: '#8896b3' }}>{u.role_name || '—'}</span></td>
+                                        <td style={tdStyle}><span style={{ fontSize: '0.72rem', color: '#8896b3' }}>{u.org_name || '—'}</span></td>
+                                        <td style={tdStyle}>{(u.total_tokens || 0).toLocaleString()}</td>
+                                        <td style={tdStyle}>{(u.total_requests || 0).toLocaleString()}</td>
+                                        <td style={tdStyle}><span style={{ fontSize: '0.72rem', color: '#8896b3' }}>{u.last_active ? new Date(u.last_active).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span></td>
                                     </tr>
-                                )
-                            })}
+                                ))}
                         </tbody>
                     </table>
                 </div>

@@ -46,11 +46,11 @@ export default function DashboardPage() {
                 </div>
                 <div style={cardStyle}>
                     <span style={labelStyle}>Tokens Used</span>
-                    <span style={valueStyle}>{usage ? usage.tokens_used.toLocaleString() : '—'}</span>
+                    <span style={valueStyle}>{usage ? (usage.total_tokens || 0).toLocaleString() : '—'}</span>
                 </div>
                 <div style={cardStyle}>
-                    <span style={labelStyle}>Token Limit</span>
-                    <span style={valueStyle}>{usage ? usage.monthly_limit.toLocaleString() : '—'}</span>
+                    <span style={labelStyle}>Total Requests</span>
+                    <span style={valueStyle}>{usage ? (usage.total_requests || 0).toLocaleString() : '—'}</span>
                 </div>
                 <div style={cardStyle}>
                     <span style={labelStyle}>Notifications</span>
@@ -58,27 +58,26 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Usage progress bar */}
+            {/* Usage summary */}
             {usage && (
                 <div style={{ ...cardStyle, marginBottom: 28 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={labelStyle}>Monthly Usage</span>
-                        <span style={{ fontSize: '0.8rem', color: usage.warning ? '#f59e0b' : '#8896b3', fontWeight: 600 }}>
-                            {usage.percentage}%
-                        </span>
+                    <span style={labelStyle}>Usage Summary</span>
+                    <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div>
+                            <span style={{ fontSize: '0.72rem', color: '#8896b3' }}>Total Tokens: </span>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f0f4ff' }}>{(usage.total_tokens || 0).toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <span style={{ fontSize: '0.72rem', color: '#8896b3' }}>Total Requests: </span>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f0f4ff' }}>{(usage.total_requests || 0).toLocaleString()}</span>
+                        </div>
+                        {usage.last_active && (
+                            <div>
+                                <span style={{ fontSize: '0.72rem', color: '#8896b3' }}>Last Active: </span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#8896b3' }}>{new Date(usage.last_active).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                            </div>
+                        )}
                     </div>
-                    <div style={{ background: '#0d1219', borderRadius: 99, height: 8, overflow: 'hidden' }}>
-                        <div style={{
-                            width: `${Math.min(usage.percentage, 100)}%`, height: '100%', borderRadius: 99,
-                            background: usage.percentage >= 90 ? '#ef4444' : usage.percentage >= 70 ? '#f59e0b' : accent,
-                            transition: 'width 0.6s ease',
-                        }} />
-                    </div>
-                    {usage.warning && (
-                        <p style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: 4 }}>
-                            ⚠️ You've used over 90% of your monthly token quota.
-                        </p>
-                    )}
                 </div>
             )}
 

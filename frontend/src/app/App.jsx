@@ -11,6 +11,7 @@ import { NotificationProvider } from '../context/NotificationContext'
 // ── Page imports ────────────────────────────────────────────────────────────
 import UploadPage from '../pages/Upload/UploadPage'
 import DocumentsPage from '../pages/Documents/DocumentsPage'
+import ProjectsPage from '../pages/Projects/ProjectsPage'
 import AnalysisPage from '../pages/Analysis/AnalysisPage'
 import NotFoundPage from '../pages/NotFound/NotFoundPage'
 import AuthPage from '../pages/Auth/AuthPage'
@@ -135,6 +136,7 @@ function AppLayout() {
                     <Routes>
                         <Route path={ROUTES.HOME} element={<UploadPage />} />
                         <Route path={ROUTES.DOCUMENTS} element={<DocumentsPage />} />
+                        <Route path={ROUTES.PROJECTS} element={<ProjectsPage />} />
                         <Route path={ROUTES.ANALYSIS} element={<AnalysisPage />} />
                         {/* Permission-gated user pages */}
                         <Route path={ROUTES.DASHBOARD} element={<PermissionRoute permissionCode="view_dashboard"><DashboardPage /></PermissionRoute>} />

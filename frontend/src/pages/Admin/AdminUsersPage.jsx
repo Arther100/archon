@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../hooks/api'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
 import ConfirmModal from '../../components/common/ConfirmModal'
 
 const ROLE_COLORS = {
@@ -27,6 +28,7 @@ function UserAvatar({ name, email, size = 36 }) {
 
 export default function AdminUsersPage() {
     const { accent } = useTheme()
+    const { refreshQuota } = useAuth()
     const [users, setUsers]   = useState([])
     const [roles, setRoles]   = useState([])
     const [loading, setLoading] = useState(true)
@@ -100,12 +102,13 @@ export default function AdminUsersPage() {
     }
 
     const saveQuota = async (userId, resetUsed = false) => {
-        setMsg('')
+        setSavingQuota(true)
         try {
             await api.adminUpdateUserQuota(userId, quotaValue, resetUsed)
             setQuotaEdit(null)
             showToast('Quota updated!')
             load()
+            refreshQuota()
         } catch (e) { showToast(e.message, false) }
         setSavingQuota(false)
     }

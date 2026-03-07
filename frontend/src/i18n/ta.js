@@ -121,6 +121,7 @@ export default {
     sidebar: {
         upload: 'பதிவேற்றம்',
         documents: 'ஆவணங்கள்',
+        projects: 'திட்டங்கள்',
         dashboard: 'டாஷ்போர்டு',
         aiSettings: 'AI அமைப்புகள்',
         feedback: 'கருத்து',

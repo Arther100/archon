@@ -70,6 +70,17 @@ export const api = {
     listDocuments: () => request('/documents'),
     listModules: (documentId) => request(`/documents/${documentId}/modules`),
     deleteDocument: (documentId) => request(`/documents/${documentId}`, { method: 'DELETE' }),
+    compareDocuments: (oldDocId, newDocId) => request('/documents/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old_document_id: oldDocId, new_document_id: newDocId }) }),
+
+    // ── Projects ──────────────────────────────────────────────────────────────
+    listProjects: () => request('/projects'),
+    createProject: (name, description) => request('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, description }) }),
+    getProject: (id) => request(`/projects/${id}`),
+    updateProject: (id, data) => request(`/projects/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+    deleteProject: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
+    assignDocuments: (projectId, documentIds) => request(`/projects/${projectId}/documents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ document_ids: documentIds }) }),
+    removeDocFromProject: (projectId, docId) => request(`/projects/${projectId}/documents/${docId}`, { method: 'DELETE' }),
+    getProjectContext: (projectId) => request(`/projects/${projectId}/context`),
 
     // ── Analysis ──────────────────────────────────────────────────────────────
     analyseModule: (moduleId) => request(`/modules/${moduleId}/analyse`, { method: 'POST' }),

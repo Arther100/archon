@@ -20,6 +20,12 @@ export default function UploadPage() {
     const isMobile = useIsMobile()
     const [state, setState] = useState({ status: 'idle', error: null, result: null })
     const [standards, setStandards] = useState('')
+    const [projects, setProjects] = useState([])
+    const [selectedProjectId, setSelectedProjectId] = useState('')
+
+    useEffect(() => {
+        api.listProjects().then(r => setProjects(r.projects || [])).catch(() => {})
+    }, [])
 
     const onDrop = useCallback(async (accepted, rejected) => {
         if (rejected.length > 0) {
@@ -36,6 +42,7 @@ export default function UploadPage() {
             const form = new FormData()
             form.append('file', accepted[0])
             if (standards.trim()) form.append('standards', standards.trim())
+            if (selectedProjectId) form.append('project_id', selectedProjectId)
 
             const data = await api.upload(form)
             setState({ status: 'done', error: null, result: data })
@@ -43,11 +50,11 @@ export default function UploadPage() {
         } catch (e) {
             setState({ status: 'error', error: e.message || t('upload.error'), result: null })
         }
-    }, [navigate, standards])
+    }, [navigate, standards, selectedProjectId])
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'application/pdf': ['.pdf'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] },
+        accept: { 'application/pdf': ['.pdf'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'], 'application/msword': ['.doc'] },
         maxSize: 20 * 1024 * 1024,
         multiple: false,
         disabled: state.status === 'uploading',
@@ -113,7 +120,7 @@ export default function UploadPage() {
                         <p style={{ color: '#f0f4ff', fontWeight: 500, fontSize: '1rem', marginBottom: 8 }}>{t('upload.dragDrop')}</p>
                         <p style={{ color: '#8896b3', fontSize: '0.875rem', marginBottom: 20 }}>{t('upload.orClick')}</p>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                            {['PDF', 'DOCX'].map(t => (
+                            {['PDF', 'DOC', 'DOCX'].map(t => (
                                 <span key={t} className="badge badge-blue">{t}</span>
                             ))}
                             <span className="badge badge-amber">Max 20MB</span>
@@ -121,6 +128,29 @@ export default function UploadPage() {
                     </>
                 )}
             </div>
+
+            {/* Project selector */}
+            {projects.length > 0 && (
+                <div style={{ width: '100%', maxWidth: 560, marginTop: 24 }} className="fade-in">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            📁 Assign to Project
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: '#2d3a4e', background: '#111622', padding: '2px 8px', borderRadius: 4 }}>Optional</span>
+                    </div>
+                    <select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}
+                        style={{
+                            width: '100%', padding: '10px 14px', borderRadius: 10,
+                            background: '#0d1219', border: '1px solid #1e2a3d', color: '#8896b3',
+                            fontSize: '0.84rem', outline: 'none', cursor: 'pointer',
+                        }}>
+                        <option value="">No project (standalone document)</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.document_count} docs)</option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Enhancement 5 — Architecture Standards textarea */}
             <div style={{ width: '100%', maxWidth: 560, marginTop: 24 }} className="fade-in">

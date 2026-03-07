@@ -121,6 +121,7 @@ export default {
     sidebar: {
         upload: 'Télécharger',
         documents: 'Documents',
+        projects: 'Projets',
         dashboard: 'Tableau de bord',
         aiSettings: 'Paramètres IA',
         feedback: 'Retour',

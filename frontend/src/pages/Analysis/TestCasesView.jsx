@@ -5,7 +5,7 @@ export default function TestCasesView({ testCases }) {
     return <div style={{ padding: 24, color: '#8896b3' }}>No test cases generated for this module.</div>
   }
   return (
-    <div style={{ padding: 24, overflowY: 'auto', maxHeight: '100%' }}>
+    <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
       <h2 style={{ fontSize: '1.1rem', color: '#f0f4ff', marginBottom: 18 }}>🧪 Test Case Summary</h2>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.95rem' }}>
         <thead>

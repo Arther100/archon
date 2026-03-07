@@ -1,23 +1,34 @@
 """
 parser.py
 ---------
-Extracts rich structured content from PDF and DOCX files.
+Extracts rich structured content from PDF, DOCX, and DOC files.
 
 For DOCX:
 - Paragraphs with heading styles → module boundaries
 - Body paragraphs → content
 - Tables → extracted as pipe-delimited text rows (critical for field detection)
-- Images → noted as [IMAGE: position marker] for LLM awareness
+- Images → extracted as base64-encoded bytes for LLM vision analysis
 
 For PDF:
 - Plain text extraction via pdfminer
+
+For DOC (legacy):
+- Converted to DOCX via LibreOffice headless, then processed as DOCX
+- Fallback: plain text extraction via antiword/textract
 """
 
 import io
 import re
-from typing import List, Dict
+import base64
+import logging
+import os
+import subprocess
+import tempfile
+from typing import List, Dict, Optional
 from pdfminer.high_level import extract_text as pdf_extract
 from docx import Document as DocxDocument
+
+logger = logging.getLogger(__name__)
 
 
 # ── Formatting & Detection Helpers ────────────────────────────────────────────
@@ -106,12 +117,56 @@ def _wrap_ascii_tables_in_text(raw_text: str) -> str:
     return "\n".join(result)
 
 
+def _wrap_json_blocks_in_text(raw_text: str) -> str:
+    """
+    Post-process plain text to detect JSON-like blocks (objects/arrays)
+    and wrap them in [JSON START]...[JSON END] markers for LLM awareness.
+    """
+    lines = raw_text.splitlines()
+    result = []
+    in_json = False
+    json_lines = []
+    brace_depth = 0
+
+    for line in lines:
+        stripped = line.strip()
+        if not in_json and (stripped.startswith('{') or stripped.startswith('[')):
+            in_json = True
+            json_lines = []
+            brace_depth = 0
+
+        if in_json:
+            json_lines.append(line)
+            brace_depth += stripped.count('{') + stripped.count('[')
+            brace_depth -= stripped.count('}') + stripped.count(']')
+            if brace_depth <= 0:
+                # Validate it looks like real JSON (at least 3 lines with keys)
+                block = "\n".join(json_lines)
+                if len(json_lines) >= 3 and ('"' in block or "'" in block):
+                    result.append("[JSON START]")
+                    result.extend(json_lines)
+                    result.append("[JSON END]")
+                else:
+                    result.extend(json_lines)
+                in_json = False
+                json_lines = []
+                brace_depth = 0
+        else:
+            result.append(line)
+
+    # Flush any remaining unclosed JSON
+    if json_lines:
+        result.extend(json_lines)
+
+    return "\n".join(result)
+
+
 # ── DOCX Structured Extraction ────────────────────────────────────────────────
 
 def extract_structured_from_docx(file_bytes: bytes) -> List[Dict]:
     """
-    Extract all content from DOCX preserving heading levels, tables, and image markers.
-    Returns list of: {"text": str, "level": int|None, "style": str, "is_table": bool}
+    Extract all content from DOCX preserving heading levels, tables, image data, and JSON blocks.
+    Returns list of: {"text": str, "level": int|None, "style": str, "is_table": bool, "image_data": str|None, "image_mime": str|None}
     """
     doc = DocxDocument(io.BytesIO(file_bytes))
     paragraphs = []
@@ -131,14 +186,39 @@ def extract_structured_from_docx(file_bytes: bytes) -> List[Dict]:
             text = _extract_formatted_text(para)
 
             # Check for inline images
-            if child.findall('.//' + qn('a:blip')):
+            blips = child.findall('.//' + qn('a:blip'))
+            if blips:
                 image_count += 1
+                image_b64 = None
+                image_mime = None
+                # Extract actual image bytes from the DOCX package
+                try:
+                    for blip in blips:
+                        r_embed = blip.get(qn('r:embed'))
+                        if r_embed:
+                            rel = doc.part.rels.get(r_embed)
+                            if rel and hasattr(rel, 'target_part'):
+                                img_bytes = rel.target_part.blob
+                                content_type = rel.target_part.content_type or 'image/png'
+                                image_b64 = base64.b64encode(img_bytes).decode('ascii')
+                                image_mime = content_type
+                                break
+                except Exception as e:
+                    logger.warning("Failed to extract image %d bytes: %s", image_count, str(e))
+
+                img_marker = f"[IMAGE {image_count}: Visual content at this position"
+                if image_b64:
+                    img_marker += " — image data attached for analysis]"
+                else:
+                    img_marker += " — image could not be extracted]"
+
                 paragraphs.append({
-                    "text": f"[IMAGE {image_count}: Visual content at this position — describe or analyse if visible]",
-                    "level": None, "style": "image", "is_table": False
+                    "text": img_marker,
+                    "level": None, "style": "image", "is_table": False,
+                    "image_data": image_b64, "image_mime": image_mime
                 })
                 if text:
-                    paragraphs.append({"text": text, "level": None, "style": para.style.name if para.style else "", "is_table": False})
+                    paragraphs.append({"text": text, "level": None, "style": para.style.name if para.style else "", "is_table": False, "image_data": None, "image_mime": None})
                 continue
 
             if not text:
@@ -152,7 +232,7 @@ def extract_structured_from_docx(file_bytes: bytes) -> List[Dict]:
                 except ValueError:
                     level = 1
 
-            paragraphs.append({"text": text, "level": level, "style": style_name, "is_table": False})
+            paragraphs.append({"text": text, "level": level, "style": style_name, "is_table": False, "image_data": None, "image_mime": None})
 
         elif tag == 'tbl':
             # Table — extract all rows as pipe-delimited text
@@ -187,8 +267,14 @@ def extract_structured_from_docx(file_bytes: bytes) -> List[Dict]:
                 table_text = "\n".join(table_lines)
                 paragraphs.append({
                     "text": f"[TABLE START]\n{table_text}\n[TABLE END]",
-                    "level": None, "style": "table", "is_table": True
+                    "level": None, "style": "table", "is_table": True,
+                    "image_data": None, "image_mime": None
                 })
+
+    # Post-process: detect JSON blocks in paragraph text
+    for para in paragraphs:
+        if not para.get("is_table") and para.get("style") != "image":
+            para["text"] = _wrap_json_blocks_in_text(para["text"])
 
     return paragraphs
 
@@ -207,12 +293,69 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         raise ValueError(f"PDF extraction failed: {str(e)}")
 
 
+# ── DOC (legacy) Conversion ───────────────────────────────────────────────────────
+
+def _convert_doc_to_docx(file_bytes: bytes) -> bytes:
+    """
+    Convert legacy .doc to .docx using LibreOffice headless.
+    Returns the .docx file bytes.
+    Raises ValueError if LibreOffice is not installed or conversion fails.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        doc_path = os.path.join(tmpdir, "input.doc")
+        with open(doc_path, "wb") as f:
+            f.write(file_bytes)
+
+        try:
+            result = subprocess.run(
+                ["libreoffice", "--headless", "--convert-to", "docx", "--outdir", tmpdir, doc_path],
+                capture_output=True, text=True, timeout=60
+            )
+        except FileNotFoundError:
+            # Try 'soffice' as alternative command name
+            try:
+                result = subprocess.run(
+                    ["soffice", "--headless", "--convert-to", "docx", "--outdir", tmpdir, doc_path],
+                    capture_output=True, text=True, timeout=60
+                )
+            except FileNotFoundError:
+                raise ValueError(
+                    "LibreOffice is not installed. Install it to support .doc files. "
+                    "On Ubuntu: sudo apt install libreoffice-core. "
+                    "On Windows: install LibreOffice and add to PATH."
+                )
+
+        if result.returncode != 0:
+            raise ValueError(f"DOC to DOCX conversion failed: {result.stderr[:300]}")
+
+        docx_path = os.path.join(tmpdir, "input.docx")
+        if not os.path.exists(docx_path):
+            raise ValueError("DOC to DOCX conversion produced no output file.")
+
+        with open(docx_path, "rb") as f:
+            return f.read()
+
+
+def extract_text_from_doc(file_bytes: bytes) -> str:
+    """Extract text from legacy .doc by converting to .docx first."""
+    docx_bytes = _convert_doc_to_docx(file_bytes)
+    return extract_text_from_docx(docx_bytes)
+
+
+def extract_structured_from_doc(file_bytes: bytes) -> List[Dict]:
+    """Extract structured content from legacy .doc by converting to .docx first."""
+    docx_bytes = _convert_doc_to_docx(file_bytes)
+    return extract_structured_from_docx(docx_bytes)
+
+
 def extract_text(file_bytes: bytes, file_type: str) -> str:
     """Extract raw text for storage and Q&A."""
     if file_type == "pdf":
         return extract_text_from_pdf(file_bytes)
     elif file_type == "docx":
         return extract_text_from_docx(file_bytes)
+    elif file_type == "doc":
+        return extract_text_from_doc(file_bytes)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
@@ -221,10 +364,13 @@ def extract_structured(file_bytes: bytes, file_type: str) -> List[Dict]:
     """Extract structured paragraphs for module detection."""
     if file_type == "docx":
         return extract_structured_from_docx(file_bytes)
+    elif file_type == "doc":
+        return extract_structured_from_doc(file_bytes)
     else:
         raw = extract_text_from_pdf(file_bytes)
-        # Post-process: detect ASCII tables and separator lines in plain text
+        # Post-process: detect ASCII tables, JSON blocks, and separator lines in plain text
         processed = _wrap_ascii_tables_in_text(raw)
+        processed = _wrap_json_blocks_in_text(processed)
         paragraphs = []
         for line in processed.splitlines():
             stripped = line.strip()

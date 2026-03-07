@@ -121,6 +121,7 @@ export default {
     sidebar: {
         upload: 'अपलोड',
         documents: 'दस्तावेज़',
+        projects: 'प्रोजेक्ट्स',
         dashboard: 'डैशबोर्ड',
         aiSettings: 'AI सेटिंग्स',
         feedback: 'प्रतिक्रिया',

@@ -456,6 +456,61 @@ function AnalysisSplitView({ blueprint, isMobile }) {
                     </div>
                 )}
 
+                {/* Implementation Guide — developer HOW-TO for this module */}
+                {doc.implementation_guide && !ns(doc.implementation_guide) && (() => {
+                    const guide = doc.implementation_guide
+                    const hasContent = !ns(guide.overview) || !ns(guide.setup_steps) || !ns(guide.key_components) || !ns(guide.integration_points) || !ns(guide.testing_strategy)
+                    if (!hasContent) return null
+                    return (
+                        <div style={{ marginTop: 20, padding: '14px', background: 'rgba(59,130,246,0.04)', borderRadius: 10, border: '1px solid rgba(59,130,246,0.2)' }}>
+                            <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>🛠️ Implementation Guide</p>
+                            {!ns(guide.overview) && (
+                                <div style={{ marginBottom: 12, padding: '10px 12px', background: 'rgba(59,130,246,0.06)', borderRadius: 8, borderLeft: '3px solid rgba(59,130,246,0.4)' }}>
+                                    <p style={{ fontSize: '0.79rem', color: '#c7d3e8', lineHeight: 1.6 }}>{guide.overview}</p>
+                                </div>
+                            )}
+                            {!ns(guide.setup_steps) && (
+                                <div style={{ marginBottom: 10 }}>
+                                    <p style={{ fontSize: '0.66rem', fontWeight: 600, color: '#93c5fd', marginBottom: 6 }}>Setup Steps</p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        {guide.setup_steps.map((step, i) => (
+                                            <div key={i} style={{ padding: '6px 10px', background: 'rgba(59,130,246,0.04)', borderRadius: 6, fontSize: '0.77rem', color: '#c7d3e8', lineHeight: 1.5, display: 'flex', gap: 8 }}>
+                                                <span style={{ color: '#60a5fa', fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>{step}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {!ns(guide.key_components) && (
+                                <div style={{ marginBottom: 10 }}>
+                                    <p style={{ fontSize: '0.66rem', fontWeight: 600, color: '#93c5fd', marginBottom: 6 }}>Key Components</p>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {guide.key_components.map((comp, i) => (
+                                            <span key={i} style={{ fontSize: '0.74rem', padding: '4px 10px', borderRadius: 6, background: 'rgba(59,130,246,0.08)', color: '#93c5fd', border: '1px solid rgba(59,130,246,0.2)' }}>⚙️ {comp}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {!ns(guide.integration_points) && (
+                                <div style={{ marginBottom: 10 }}>
+                                    <p style={{ fontSize: '0.66rem', fontWeight: 600, color: '#93c5fd', marginBottom: 6 }}>Integration Points</p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        {guide.integration_points.map((pt, i) => (
+                                            <div key={i} style={{ padding: '6px 10px', borderRadius: 6, fontSize: '0.77rem', color: '#c7d3e8', lineHeight: 1.5 }}>🔌 {pt}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {!ns(guide.testing_strategy) && (
+                                <div style={{ padding: '8px 12px', background: 'rgba(34,197,94,0.04)', borderRadius: 6, border: '1px solid rgba(34,197,94,0.15)' }}>
+                                    <p style={{ fontSize: '0.66rem', fontWeight: 600, color: '#4ade80', marginBottom: 4 }}>Testing Strategy</p>
+                                    <p style={{ fontSize: '0.77rem', color: '#c7d3e8', lineHeight: 1.5 }}>{guide.testing_strategy}</p>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })()}
+
                 {/* Discussion Items — inline comments and unresolved questions */}
                 {!ns(doc.discussion_items) && (
                     <div style={{ marginTop: 16, padding: '14px', background: 'rgba(245,158,11,0.03)', borderRadius: 10, border: '1px solid rgba(245,158,11,0.15)' }}>
@@ -1212,11 +1267,17 @@ export default function AnalysisPage() {
                             {/* Content area */}
 
                             {activeTab === 'chat' ? (
-                                <QAChatFullView documentId={documentId} activeModule={activeModule} isMobile={isMobile} />
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                    <QAChatFullView documentId={documentId} activeModule={activeModule} isMobile={isMobile} />
+                                </div>
                             ) : activeTab === 'connectivity' ? (
-                                <ConnectivityMapView documentId={documentId} />
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                    <ConnectivityMapView documentId={documentId} />
+                                </div>
                             ) : activeTab === 'testcases' ? (
-                                <TestCasesView testCases={blueprint?.test_cases || []} />
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                    <TestCasesView testCases={blueprint?.test_cases || []} />
+                                </div>
                             ) : loading ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
                                     <div className="spinner" style={{ width: 38, height: 38 }} />

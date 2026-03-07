@@ -3,6 +3,8 @@ export const ROUTES = {
     HOME: '/',
     DASHBOARD: '/dashboard',
     DOCUMENTS: '/documents',
+    PROJECTS: '/projects',
+    PROJECT_DETAIL: '/projects/:id',
     ANALYSIS: '/documents/:id',
     AI_SETTINGS: '/ai-settings',
     FEEDBACK: '/feedback',
@@ -27,3 +29,4 @@ export const ROUTES = {
 
 export const analysisRoute = (id) => `/documents/${id}`
 export const planDetailRoute = (id) => `/plans/${id}`
+export const projectRoute = (id) => `/projects/${id}`

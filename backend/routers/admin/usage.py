@@ -17,25 +17,13 @@ def usage_summary(user_ctx: dict = Depends(require_permission("view_usage"))):
     summaries = sb.table("user_usage_summary").select("*").execute()
     data = summaries.data or []
 
-    total_tokens = sum(s.get("tokens_used", 0) for s in data)
-    total_limit = sum(s.get("monthly_limit", 0) for s in data)
-    users_near_limit = sum(
-        1 for s in data
-        if s.get("monthly_limit", 0) > 0
-        and (s.get("tokens_used", 0) / s["monthly_limit"]) >= 0.9
-    )
-    users_over_limit = sum(
-        1 for s in data
-        if s.get("monthly_limit", 0) > 0
-        and s.get("tokens_used", 0) >= s["monthly_limit"]
-    )
+    total_tokens = sum(s.get("total_tokens", 0) for s in data)
+    total_requests = sum(s.get("total_requests", 0) for s in data)
 
     return {
         "total_users": len(data),
         "total_tokens_used": total_tokens,
-        "total_token_limit": total_limit,
-        "users_near_limit_90": users_near_limit,
-        "users_over_limit": users_over_limit,
+        "total_requests": total_requests,
     }
 
 
@@ -52,7 +40,7 @@ def usage_by_users(
     query = sb.table("user_usage_summary").select("*", count="exact")
     if organization_id:
         query = query.eq("organization_id", organization_id)
-    result = query.order("tokens_used", desc=True).range(offset, offset + per_page - 1).execute()
+    result = query.order("total_tokens", desc=True).range(offset, offset + per_page - 1).execute()
     return {
         "users": result.data,
         "total": result.count,
@@ -103,12 +91,12 @@ def my_usage(user_ctx: dict = Depends(get_user_profile)):
         summary_data = summary.data[0] if summary.data else None
     except Exception:
         summary_data = None
-    data = summary_data or {"tokens_used": 0, "monthly_limit": 1000000, "remaining_tokens": 1000000}
-    pct = round((data.get("tokens_used", 0) / max(data.get("monthly_limit", 1), 1)) * 100, 1)
+    data = summary_data or {"total_tokens": 0, "total_requests": 0, "total_cost_usd": 0}
     return {
         "usage": {
             **data,
-            "percentage": pct,
-            "warning": pct >= 90,
+            "total_tokens": data.get("total_tokens", 0),
+            "total_requests": data.get("total_requests", 0),
+            "total_cost_usd": data.get("total_cost_usd", 0),
         }
     }
